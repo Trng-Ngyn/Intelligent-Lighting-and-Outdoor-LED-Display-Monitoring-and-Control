@@ -1,0 +1,14 @@
+target/
+bin/
+obj/
+node_modules/
+.venv/
+env/
+__pycache__/
+*.pyc
+.env
+.env.local
+*.log
+.DS_Store
+Thumbs.db
+
