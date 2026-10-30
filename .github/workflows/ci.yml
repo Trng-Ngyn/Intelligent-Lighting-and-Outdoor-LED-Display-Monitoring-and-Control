@@ -1,0 +1,33 @@
+name: Continuous Integration & Security Linting
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Linting & Validation Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 jsonschema paho-mqtt
+
+      - name: Validate JSON Schemas (Annex C)
+        run: |
+          python -c "import json; json.load(open('docs/data_contracts/schemas.json'))"
+          echo "Data contracts syntax check passed!"
+
+      - name: Lint Backend and Tools Scripts
+        run: |
+          flake8 src/backend tools --count --select=E9,F63,F7,F82 --show-source --statistics
