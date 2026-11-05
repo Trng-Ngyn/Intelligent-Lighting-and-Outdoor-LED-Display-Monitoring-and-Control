@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PCCOM_Annex_C_Telemetry_Schema",
+  "description": "Chuẩn dữ liệu Telemetry cho 50 điểm chiếu sáng và 2 màn hình LED ngoài trời theo Annex C (DAT 01)",
+  "type": "object",
+  "required": ["schema_version", "message_id", "asset_id", "sequence", "source_time", "metrics", "quality"],
+  "properties": {
+    "schema_version": { "type": "string", "enum": ["1.0.0"] },
+    "message_id": { "type": "string" },
+    "asset_id": { "type": "string" },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "source_time": { "type": "integer" },
+    "metrics": {
+      "type": "object",
+      "required": ["power_w", "energy_wh", "voltage_v", "current_a", "temperature_c", "ambient_lux"],
+      "properties": {
+        "power_w": { "type": "number", "minimum": 0 },
+        "energy_wh": { "type": "number", "minimum": 0 },
+        "voltage_v": { "type": "number", "minimum": 0, "maximum": 300 },
+        "current_a": { "type": "number", "minimum": 0, "maximum": 50 },
+        "power_factor": { "type": "number", "minimum": 0, "maximum": 1 },
+        "temperature_c": { "type": "number", "minimum": -20, "maximum": 120 },
+        "ambient_lux": { "type": "number", "minimum": 0, "maximum": 100000 }
+      }
+    },
+    "brightness_pct": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "relay_state": { "type": "boolean" },
+    "quality": { "type": "string", "enum": ["GOOD", "ESTIMATED", "DEGRADED"] }
+  }
+}
