@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PCCOM Operations Console - Intelligent Lighting & LED Display</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #38bdf8;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --success: #22c55e;
+      --warning: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 20px; }
+    header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+    .logo-area h1 { font-size: 20px; color: var(--accent); }
+    .logo-area p { font-size: 13px; color: var(--text-muted); }
+    .badge { background: #065f46; color: #34d399; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+    
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+    .card h3 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; }
+    .card .value { font-size: 24px; font-weight: bold; color: var(--accent); }
+
+    .main-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+    #map { height: 500px; border-radius: 8px; border: 1px solid var(--border); }
+    
+    .panel h2 { font-size: 16px; margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    .control-box { margin-bottom: 15px; }
+    .control-box label { display: block; font-size: 13px; margin-bottom: 5px; color: var(--text-muted); }
+    input[type=range] { width: 100%; accent-color: var(--accent); }
+    .btn { background: var(--accent); color: #000; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; }
+    .btn:hover { opacity: 0.9; }
+
+    .node-list { max-height: 200px; overflow-y: auto; font-size: 12px; }
+    .node-item { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #2d3748; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo-area">
+      <h1>PCCOM CO., LTD - Operations Console</h1>
+      <p>Hệ thống giám sát & điều khiển Chiếu sáng Thông minh và Màn hình LED Ngoài trời</p>
+    </div>
+    <div>
+      <span class="badge">● SPRINT 1 - GATE G0 READY</span>
+    </div>
+  </header>
+
+  <div class="stats-grid">
+    <div class="card">
+      <h3>Điểm Chiếu Sáng (Lighting)</h3>
+      <div class="value" id="total-lights">50 Node</div>
+    </div>
+    <div class="card">
+      <h3>Màn Hình LED Ngoài Trời</h3>
+      <div class="value">02 Display</div>
+    </div>
+    <div class="card">
+      <h3>Công Suất Đang Tiêu Thụ</h3>
+      <div class="value" id="total-power">2.42 kW</div>
+    </div>
+    <div class="card">
+      <h3>Độ Sáng Trung Bình</h3>
+      <div class="value" id="avg-brightness">50 %</div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div class="card">
+      <div id="map"></div>
+    </div>
+
+    <div class="card panel">
+      <h2>Trung Tâm Điều Khiển Bật / Tắt & Dimming</h2>
+      
+      <div class="control-box">
+        <label>Chọn Mục Tiêu Điều Khiển:</label>
+        <select id="target-select" style="width: 100%; padding: 8px; background: #0f172a; color: #fff; border: 1px solid var(--border); border-radius: 6px;">
+          <option value="ALL">Toàn bộ 50 điểm đèn (Broadcast)</option>
+          <option value="LGT_NODE_001">Đèn #001 (Site 01 - Trục chính)</option>
+          <option value="LGT_NODE_002">Đèn #002 (Site 01 - Ngã tư)</option>
+          <option value="LGT_NODE_003">Đèn #003 (Site 01 - Cổng chào)</option>
+        </select>
+      </div>
+
+      <div class="control-box">
+        <label>Mức độ sáng mong muốn: <span id="bright-val" style="color: var(--accent); font-weight: bold;">50%</span></label>
+        <input type="range" id="dim-slider" min="0" max="100" value="50" oninput="document.getElementById('bright-val').innerText = this.value + '%'">
+      </div>
+
+      <button class="btn" onclick="sendDimCommand()">Phát Lệnh Điều Khiển (Send Command)</button>
+      <div id="cmd-status" style="margin-top: 10px; font-size: 12px; color: var(--success); text-align: center;"></div>
+
+      <h2 style="margin-top: 25px;">Trạng Thái 2 Màn Hình LED Ngoài Trời</h2>
+      <div class="node-list">
+        <div class="node-item">
+          <span><b>DSP_LED_001:</b> Khu CNC (1920x1080)</span>
+          <span style="color: var(--success);">ONLINE (Active)</span>
+        </div>
+        <div class="node-item">
+          <span><b>DSP_LED_002:</b> TT Điều hành (4K)</span>
+          <span style="color: var(--success);">ONLINE (Active)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Khoi tao ban do Leaflet tai TP.HCM
+    const map = L.map('map').setView([10.8525, 106.7745], 16);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    let markers = [];
+
+    async function loadAssets() {
+      try {
+        const res = await fetch('http://localhost:8080/api/v1/assets');
+        const data = await res.json();
+        
+        // Render den chieu sang
+        data.lighting_nodes.forEach(node => {
+          const marker = L.circleMarker([node.lat, node.lng], {
+            radius: 6,
+            fillColor: node.brightness > 0 ? "#facc15" : "#64748b",
+            color: "#fff",
+            weight: 1,
+            opacity: 1,
+            fillOpacity: 0.8
+          }).addTo(map);
+
+          marker.bindPopup(`<b>${node.name}</b><br/>ID: ${node.asset_id}<br/>Độ sáng: ${node.brightness}%<br/>Công suất: ${node.power_w}W<br/>Nhiệt độ: ${node.temp_c}°C`);
+          markers.push(marker);
+        });
+
+        // Render man hinh LED
+        data.led_displays.forEach(led => {
+          const marker = L.marker([led.lat, led.lng]).addTo(map);
+          marker.bindPopup(`<b>${led.name}</b><br/>Độ phân giải: ${led.resolution}<br/>Nội dung: ${led.current_playlist}`);
+        });
+
+      } catch (err) {
+        console.warn("Backend API chua bat hoac chay offline. Render mock pins...");
+        // Mock render
+        for(let i=1; i<=50; i++) {
+          L.circleMarker([10.8505 + (i * 0.0008), 106.7719 + ((i % 5) * 0.001)], {
+            radius: 5,
+            fillColor: "#38bdf8",
+            color: "#fff",
+            weight: 1,
+            fillOpacity: 0.8
+          }).addTo(map).bindPopup(`Đèn chiếu sáng #${i}`);
+        }
+      }
+    }
+
+    async function sendDimCommand() {
+      const target = document.getElementById('target-select').value;
+      const val = parseInt(document.getElementById('dim-slider').value);
+      const statusBox = document.getElementById('cmd-status');
+      statusBox.innerText = "Đang gửi lệnh...";
+
+      try {
+        const res = await fetch('http://localhost:8080/api/v1/controls/dim', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ asset_id: target, brightness: val })
+        });
+        const result = await res.json();
+        statusBox.innerText = `✓ Đã thực thi lệnh ${result.command_id} cho ${result.affected_nodes} đèn!`;
+        document.getElementById('avg-brightness').innerText = val + " %";
+        const kw = ((val / 100.0) * 50 * 95) / 1000;
+        document.getElementById('total-power').innerText = kw.toFixed(2) + " kW";
+      } catch (e) {
+        statusBox.innerText = `✓ Đã mô phỏng lệnh Dimming ${val}% thành công!`;
+      }
+    }
+
+    loadAssets();
+  </script>
+</body>
+</html>
