@@ -9,6 +9,7 @@ __pycache__/
 .env
 .env.local
 *.log
+~$*.docx
 .DS_Store
 Thumbs.db
 
