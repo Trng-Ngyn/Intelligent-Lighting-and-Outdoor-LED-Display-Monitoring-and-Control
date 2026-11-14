@@ -1,0 +1,893 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:pccom:w3-de:v1:telemetry.lighting",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "message_type": {
+      "const": "telemetry.lighting"
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 36,
+      "maxLength": 36,
+      "pattern": "^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$"
+    },
+    "site_id": {
+      "type": "string",
+      "minLength": 36,
+      "maxLength": 36,
+      "pattern": "^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$"
+    },
+    "asset_id": {
+      "type": "string",
+      "minLength": 36,
+      "maxLength": 36,
+      "pattern": "^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$"
+    },
+    "device_id": {
+      "type": "string",
+      "minLength": 36,
+      "maxLength": 36,
+      "pattern": "^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$"
+    },
+    "message_id": {
+      "type": "string",
+      "minLength": 36,
+      "maxLength": 36,
+      "pattern": "^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$"
+    },
+    "source_time": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?Z(?![\\s\\S])"
+    },
+    "received_time": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?Z(?![\\s\\S])"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "firmware": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "\\S"
+    },
+    "clock_quality": {
+      "type": "string",
+      "enum": [
+        "synced",
+        "uncertain"
+      ]
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "power_w": {
+          "type": "object",
+          "properties": {
+            "value": {},
+            "unit": {
+              "const": "W"
+            },
+            "quality": {
+              "type": "string",
+              "enum": [
+                "measured",
+                "estimated",
+                "unavailable",
+                "invalid",
+                "stuck"
+              ]
+            }
+          },
+          "required": [
+            "value",
+            "unit",
+            "quality"
+          ],
+          "additionalProperties": false,
+          "if": {
+            "properties": {
+              "quality": {
+                "type": "string",
+                "enum": [
+                  "measured",
+                  "estimated"
+                ]
+              }
+            },
+            "required": [
+              "quality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        "energy_interval_wh": {
+          "type": "object",
+          "properties": {
+            "value": {},
+            "unit": {
+              "const": "Wh"
+            },
+            "quality": {
+              "type": "string",
+              "enum": [
+                "measured",
+                "estimated",
+                "unavailable",
+                "invalid",
+                "stuck"
+              ]
+            }
+          },
+          "required": [
+            "value",
+            "unit",
+            "quality"
+          ],
+          "additionalProperties": false,
+          "if": {
+            "properties": {
+              "quality": {
+                "type": "string",
+                "enum": [
+                  "measured",
+                  "estimated"
+                ]
+              }
+            },
+            "required": [
+              "quality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000000000
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        "energy_register_wh": {
+          "type": "object",
+          "properties": {
+            "value": {},
+            "unit": {
+              "const": "Wh"
+            },
+            "quality": {
+              "type": "string",
+              "enum": [
+                "measured",
+                "estimated",
+                "unavailable",
+                "invalid",
+                "stuck"
+              ]
+            }
+          },
+          "required": [
+            "value",
+            "unit",
+            "quality"
+          ],
+          "additionalProperties": false,
+          "if": {
+            "properties": {
+              "quality": {
+                "type": "string",
+                "enum": [
+                  "measured",
+                  "estimated"
+                ]
+              }
+            },
+            "required": [
+              "quality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000000000
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        "voltage_v": {
+          "type": "object",
+          "properties": {
+            "value": {},
+            "unit": {
+              "const": "V"
+            },
+            "quality": {
+              "type": "string",
+              "enum": [
+                "measured",
+                "estimated",
+                "unavailable",
+                "invalid",
+                "stuck"
+              ]
+            }
+          },
+          "required": [
+            "value",
+            "unit",
+            "quality"
+          ],
+          "additionalProperties": false,
+          "if": {
+            "properties": {
+              "quality": {
+                "type": "string",
+                "enum": [
+                  "measured",
+                  "estimated"
+                ]
+              }
+            },
+            "required": [
+              "quality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        "current_a": {
+          "type": "object",
+          "properties": {
+            "value": {},
+            "unit": {
+              "const": "A"
+            },
+            "quality": {
+              "type": "string",
+              "enum": [
+                "measured",
+                "estimated",
+                "unavailable",
+                "invalid",
+                "stuck"
+              ]
+            }
+          },
+          "required": [
+            "value",
+            "unit",
+            "quality"
+          ],
+          "additionalProperties": false,
+          "if": {
+            "properties": {
+              "quality": {
+                "type": "string",
+                "enum": [
+                  "measured",
+                  "estimated"
+                ]
+              }
+            },
+            "required": [
+              "quality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 10000
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        "power_factor": {
+          "type": "object",
+          "properties": {
+            "value": {},
+            "unit": {
+              "const": "1"
+            },
+            "quality": {
+              "type": "string",
+              "enum": [
+                "measured",
+                "estimated",
+                "unavailable",
+                "invalid",
+                "stuck"
+              ]
+            }
+          },
+          "required": [
+            "value",
+            "unit",
+            "quality"
+          ],
+          "additionalProperties": false,
+          "if": {
+            "properties": {
+              "quality": {
+                "type": "string",
+                "enum": [
+                  "measured",
+                  "estimated"
+                ]
+              }
+            },
+            "required": [
+              "quality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "number",
+                "minimum": -1,
+                "maximum": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        "illuminance_lx": {
+          "type": "object",
+          "properties": {
+            "value": {},
+            "unit": {
+              "const": "lx"
+            },
+            "quality": {
+              "type": "string",
+              "enum": [
+                "measured",
+                "estimated",
+                "unavailable",
+                "invalid",
+                "stuck"
+              ]
+            }
+          },
+          "required": [
+            "value",
+            "unit",
+            "quality"
+          ],
+          "additionalProperties": false,
+          "if": {
+            "properties": {
+              "quality": {
+                "type": "string",
+                "enum": [
+                  "measured",
+                  "estimated"
+                ]
+              }
+            },
+            "required": [
+              "quality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 250000
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        "temperature_c": {
+          "type": "object",
+          "properties": {
+            "value": {},
+            "unit": {
+              "const": "°C"
+            },
+            "quality": {
+              "type": "string",
+              "enum": [
+                "measured",
+                "estimated",
+                "unavailable",
+                "invalid",
+                "stuck"
+              ]
+            }
+          },
+          "required": [
+            "value",
+            "unit",
+            "quality"
+          ],
+          "additionalProperties": false,
+          "if": {
+            "properties": {
+              "quality": {
+                "type": "string",
+                "enum": [
+                  "measured",
+                  "estimated"
+                ]
+              }
+            },
+            "required": [
+              "quality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "number",
+                "minimum": -80,
+                "maximum": 200
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        "heartbeat": {
+          "type": "object",
+          "properties": {
+            "value": {},
+            "unit": {
+              "const": "1"
+            },
+            "quality": {
+              "type": "string",
+              "enum": [
+                "measured",
+                "estimated",
+                "unavailable",
+                "invalid",
+                "stuck"
+              ]
+            }
+          },
+          "required": [
+            "value",
+            "unit",
+            "quality"
+          ],
+          "additionalProperties": false,
+          "if": {
+            "properties": {
+              "quality": {
+                "type": "string",
+                "enum": [
+                  "measured",
+                  "estimated"
+                ]
+              }
+            },
+            "required": [
+              "quality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "const": true
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        "is_on": {
+          "type": "object",
+          "properties": {
+            "value": {},
+            "unit": {
+              "const": "1"
+            },
+            "quality": {
+              "type": "string",
+              "enum": [
+                "measured",
+                "estimated",
+                "unavailable",
+                "invalid",
+                "stuck"
+              ]
+            }
+          },
+          "required": [
+            "value",
+            "unit",
+            "quality"
+          ],
+          "additionalProperties": false,
+          "if": {
+            "properties": {
+              "quality": {
+                "type": "string",
+                "enum": [
+                  "measured",
+                  "estimated"
+                ]
+              }
+            },
+            "required": [
+              "quality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "boolean"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        "dimming_pct": {
+          "type": "object",
+          "properties": {
+            "value": {},
+            "unit": {
+              "const": "%"
+            },
+            "quality": {
+              "type": "string",
+              "enum": [
+                "measured",
+                "estimated",
+                "unavailable",
+                "invalid",
+                "stuck"
+              ]
+            }
+          },
+          "required": [
+            "value",
+            "unit",
+            "quality"
+          ],
+          "additionalProperties": false,
+          "if": {
+            "properties": {
+              "quality": {
+                "type": "string",
+                "enum": [
+                  "measured",
+                  "estimated"
+                ]
+              }
+            },
+            "required": [
+              "quality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        "runtime_s": {
+          "type": "object",
+          "properties": {
+            "value": {},
+            "unit": {
+              "const": "s"
+            },
+            "quality": {
+              "type": "string",
+              "enum": [
+                "measured",
+                "estimated",
+                "unavailable",
+                "invalid",
+                "stuck"
+              ]
+            }
+          },
+          "required": [
+            "value",
+            "unit",
+            "quality"
+          ],
+          "additionalProperties": false,
+          "if": {
+            "properties": {
+              "quality": {
+                "type": "string",
+                "enum": [
+                  "measured",
+                  "estimated"
+                ]
+              }
+            },
+            "required": [
+              "quality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        "driver_fault_code": {
+          "type": "object",
+          "properties": {
+            "value": {},
+            "unit": {
+              "const": "1"
+            },
+            "quality": {
+              "type": "string",
+              "enum": [
+                "measured",
+                "estimated",
+                "unavailable",
+                "invalid",
+                "stuck"
+              ]
+            }
+          },
+          "required": [
+            "value",
+            "unit",
+            "quality"
+          ],
+          "additionalProperties": false,
+          "if": {
+            "properties": {
+              "quality": {
+                "type": "string",
+                "enum": [
+                  "measured",
+                  "estimated"
+                ]
+              }
+            },
+            "required": [
+              "quality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80,
+                "pattern": "\\S"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      },
+      "required": [],
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+    "energy_interval_start": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?Z(?![\\s\\S])"
+    },
+    "counter_epoch": {
+      "type": "string",
+      "minLength": 36,
+      "maxLength": 36,
+      "pattern": "^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$"
+    }
+  },
+  "required": [
+    "schema_version",
+    "message_type",
+    "tenant_id",
+    "site_id",
+    "asset_id",
+    "device_id",
+    "message_id",
+    "source_time",
+    "received_time",
+    "sequence",
+    "firmware",
+    "clock_quality",
+    "metrics"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "metrics": {
+            "required": [
+              "energy_interval_wh"
+            ],
+            "properties": {
+              "energy_interval_wh": {
+                "properties": {
+                  "quality": {
+                    "type": "string",
+                    "enum": [
+                      "measured",
+                      "estimated"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "energy_interval_start"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "energy_interval_start"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "metrics": {
+            "required": [
+              "energy_register_wh"
+            ],
+            "properties": {
+              "energy_register_wh": {
+                "properties": {
+                  "quality": {
+                    "type": "string",
+                    "enum": [
+                      "measured",
+                      "estimated"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "counter_epoch"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "counter_epoch"
+          ]
+        }
+      }
+    }
+  ]
+}
