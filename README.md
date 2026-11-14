@@ -40,14 +40,31 @@ An integrated IoT and cloud platform designed to monitor and manage outdoor smar
 ## 🛠️ Project Structure
 ```text
 ├── docs/                   # Tài liệu yêu cầu, báo cáo tuần, kiến trúc
-│   ├── weekly_reports/     # Báo cáo tiến độ hàng tuần nộp LMS (Week 02, Week 03,...)
-│   └── architecture/       # Thiết kế kiến trúc, Data contracts, Security threat models
+│   ├── specifications/     # Đặc tả giao thức, nghiệp vụ, quy chuẩn an toàn
+│   ├── test_reports/       # Báo cáo kiểm thử E2E/LWT kèm số đo thực tế
+│   └── weekly_reports/     # Báo cáo tiến độ hàng tuần nộp LMS (Week 02, Week 03,...)
 ├── src/
-│   ├── edge/               # Mã nguồn Edge Gateway / Device Controller (DALI, D4i, MQTT)
-│   ├── backend/            # API Core & Content Distribution Engine
-│   ├── frontend/           # Web Console & GIS Dashboard
-│   └── ml_service/         # Mô hình Adaptive Lighting & Anomaly Detection
-├── tests/                  # Bộ kiểm thử tự động (AT 01 - AT 12)
-└── tools/                  # Script tự động hóa đồng bộ Jira, tạo repo GitHub
+│   ├── iot_protocol/       # Topic taxonomy, HMAC, User Properties, MQTT 5 helpers
+│   ├── edge_simulator/     # Virtual Edge Simulator MQTT 5 (đèn/LED/gateway)
+│   ├── backend/            # Mock Cloud Service & Core API
+│   ├── firmware_esp32/     # Firmware gateway/controller ESP32
+│   └── frontend/           # Web Console & GIS Dashboard
+├── tests/                  # Unit test giao thức và cấu hình simulator
+└── tools/                  # Probe MQTT 5, script Jira, tạo repo GitHub
+```
+
+## 🔌 MQTT 5 Protocol & Simulator
+- Đặc tả giao thức: [`docs/specifications/MQTT5_COMMUNICATION_PROTOCOL.md`](docs/specifications/MQTT5_COMMUNICATION_PROTOCOL.md)
+- Hướng dẫn simulator: [`src/edge_simulator/README.md`](src/edge_simulator/README.md)
+- Báo cáo E2E/LWT: [`docs/test_reports/MQTT5_E2E_REPORT.md`](docs/test_reports/MQTT5_E2E_REPORT.md)
+- Changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
+
+Chạy nhanh với broker công cộng:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+Copy-Item config.example.json config.json
+.\.venv\Scripts\python.exe src\edge_simulator\virtual_lighting_network.py --max-devices 5
 ```
 

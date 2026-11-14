@@ -28,6 +28,10 @@ jobs:
           python -c "import json; json.load(open('docs/data_contracts/schemas.json'))"
           echo "Data contracts syntax check passed!"
 
-      - name: Lint Backend and Tools Scripts
+      - name: Run Protocol and Simulator Unit Tests
         run: |
-          flake8 src/backend tools --count --select=E9,F63,F7,F82 --show-source --statistics
+          python -m unittest discover -s tests -p "test_*.py" -v
+
+      - name: Lint Backend, MQTT Protocol and Tools
+        run: |
+          flake8 src/iot_protocol src/edge_simulator src/backend tools tests --count --select=E9,F63,F7,F82 --show-source --statistics

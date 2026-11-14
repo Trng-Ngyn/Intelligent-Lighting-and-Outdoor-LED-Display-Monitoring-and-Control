@@ -8,8 +8,13 @@ __pycache__/
 *.pyc
 .env
 .env.local
+config.json
+config.local.json
 *.log
 ~$*.docx
 .DS_Store
 Thumbs.db
+.pytest_cache/
+htmlcov/
+.coverage
 

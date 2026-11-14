@@ -1,0 +1,15 @@
+[flake8]
+max-line-length = 100
+extend-ignore = E203,W503
+exclude =
+    .git,
+    .venv,
+    __pycache__,
+    src/firmware_esp32,
+    tests/bench_tests_g0.py
+per-file-ignores =
+    src/edge_simulator/virtual_lighting_network.py: E402
+    src/backend/mock_cloud_service.py: E402
+    src/backend/core_api.py: E402
+    tools/mqtt5_probe.py: E402
+    tests/test_*.py: E402
