@@ -1,0 +1,556 @@
+openapi: 3.1.0
+info:
+  title: Intelligent Lighting and Outdoor LED Display Platform - Content API
+  version: 1.0.0
+  description: >
+    Đặc tả API đề xuất cho SCRUM-19, bám các yêu cầu DSP 02-04, PUB 01-04,
+    SEC 02 và SEC 04 trong RFP. Endpoint và tên role là thiết kế triển khai
+    đề xuất cho bài tập, không phải URL được RFP ấn định.
+servers:
+  - url: https://api.example.com/v1
+    description: URL môi trường mẫu, cần thay bằng URL triển khai thực tế
+tags:
+  - name: Content
+  - name: Approval
+  - name: Publication
+  - name: Administration
+  - name: Audit
+security:
+  - bearerAuth: []
+paths:
+  /content:
+    post:
+      tags: [Content]
+      operationId: createContent
+      summary: Tạo bản ghi nội dung LED
+      description: Author tạo nội dung ở trạng thái drafted.
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/SiteId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContentCreate'
+      responses:
+        '201':
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Content'
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+    get:
+      tags: [Content]
+      operationId: listContent
+      summary: Liệt kê nội dung trong phạm vi được cấp quyền
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/SiteId'
+        - name: status
+          in: query
+          schema: {$ref: '#/components/schemas/ContentStatus'}
+        - name: page
+          in: query
+          schema: {type: integer, minimum: 1, default: 1}
+        - name: pageSize
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+      responses:
+        '200':
+          description: Danh sách nội dung
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ContentPage'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /content/{contentId}:
+    parameters:
+      - $ref: '#/components/parameters/ContentId'
+      - $ref: '#/components/parameters/TenantId'
+    get:
+      tags: [Content]
+      operationId: getContent
+      summary: Xem chi tiết nội dung
+      responses:
+        '200':
+          description: Chi tiết nội dung
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Content'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      tags: [Content]
+      operationId: updateContent
+      summary: Cập nhật nội dung bản nháp
+      description: >
+        Thay đổi content, target, schedule hoặc policy làm approval cũ mất hiệu lực
+        theo PUB 01. Chỉ sửa tài nguyên ở trạng thái cho phép chỉnh sửa.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ContentUpdate'}
+      responses:
+        '200':
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Content'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /content/{contentId}/validate:
+    post:
+      tags: [Content]
+      operationId: validateContent
+      summary: Kiểm tra file và metadata
+      description: Kiểm tra codec, độ phân giải, kích thước, quyền nội dung, metadata và malware scan.
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+        - $ref: '#/components/parameters/TenantId'
+      responses:
+        '200':
+          description: Kết quả kiểm tra
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ValidationResult'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /content/{contentId}/submit-approval:
+    post:
+      tags: [Approval]
+      operationId: submitApproval
+      summary: Gửi nội dung để phê duyệt
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: {type: string, maxLength: 1000}
+      responses:
+        '202':
+          description: Đã tạo yêu cầu duyệt
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Approval'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /approvals/{approvalId}/decision:
+    post:
+      tags: [Approval]
+      operationId: decideApproval
+      summary: Phê duyệt hoặc từ chối nội dung
+      description: Approver phải khác author; quyết định gắn với manifest/version đang chờ duyệt.
+      parameters:
+        - $ref: '#/components/parameters/ApprovalId'
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ApprovalDecision'}
+      responses:
+        '200':
+          description: Đã ghi nhận quyết định
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Approval'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /content/{contentId}/publish:
+    post:
+      tags: [Publication]
+      operationId: publishContent
+      summary: Yêu cầu xuất bản nội dung đã duyệt
+      description: Kiểm tra approval, hash, target, lịch, expiry và manifest trước phân phối.
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PublishRequest'}
+      responses:
+        '202':
+          description: Đã nhận yêu cầu phân phối
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Publication'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationError'}
+  /content/{contentId}/revoke:
+    post:
+      tags: [Publication]
+      operationId: revokeContent
+      summary: Thu hồi nội dung
+      description: >
+        Ghi nhận kết quả thu hồi. Player mất kết nối không thể nhận lệnh cloud ngay;
+        phải thực thi expiry/fallback cục bộ theo policy.
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RevokeRequest'}
+      responses:
+        '202':
+          description: Đã tiếp nhận yêu cầu thu hồi
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Publication'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /publications/{publicationId}:
+    get:
+      tags: [Publication]
+      operationId: getPublication
+      summary: Theo dõi trạng thái phân phối/xuất bản
+      parameters:
+        - $ref: '#/components/parameters/PublicationId'
+        - $ref: '#/components/parameters/TenantId'
+      responses:
+        '200':
+          description: Trạng thái xuất bản
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Publication'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /roles:
+    get:
+      tags: [Administration]
+      operationId: listRoles
+      summary: Liệt kê vai trò và quyền
+      responses:
+        '200':
+          description: Danh sách vai trò
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Role'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /users/{userId}/roles:
+    put:
+      tags: [Administration]
+      operationId: assignUserRoles
+      summary: Gán vai trò cho người dùng
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: {type: string}
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RoleAssignment'}
+      responses:
+        '200':
+          description: Cập nhật vai trò
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoleAssignment'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /audit-events:
+    get:
+      tags: [Audit]
+      operationId: listAuditEvents
+      summary: Tra cứu nhật ký kiểm toán
+      description: Chỉ Auditor hoặc role được cấp quyền audit; audit log được bảo vệ khỏi sửa đổi trái phép.
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: siteId
+          in: query
+          schema: {type: string}
+        - name: action
+          in: query
+          schema: {type: string}
+        - name: from
+          in: query
+          schema: {type: string, format: date-time}
+        - name: to
+          in: query
+          schema: {type: string, format: date-time}
+      responses:
+        '200':
+          description: Danh sách audit event
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/AuditEvent'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token do hệ thống định danh cấp; MFA cho người dùng đặc quyền theo SEC 02.
+  parameters:
+    TenantId:
+      name: X-Tenant-Id
+      in: header
+      required: true
+      schema: {type: string}
+    SiteId:
+      name: X-Site-Id
+      in: header
+      required: true
+      schema: {type: string}
+    ContentId:
+      name: contentId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    ApprovalId:
+      name: approvalId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    PublicationId:
+      name: publicationId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+  responses:
+    BadRequest:
+      description: Request không hợp lệ
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Unauthorized:
+      description: Chưa xác thực hoặc token không hợp lệ
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Forbidden:
+      description: Không đủ quyền hoặc ngoài tenant/site scope
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    NotFound:
+      description: Không tìm thấy tài nguyên trong phạm vi được phép
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Conflict:
+      description: Xung đột trạng thái hoặc approval hết hiệu lực
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    ValidationError:
+      description: Dữ liệu không đạt kiểm tra nghiệp vụ
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+  schemas:
+    ContentStatus:
+      type: string
+      enum: [drafted, validated, approved, distributing, ready, active, expired, revoked, failed]
+    ContentCreate:
+      type: object
+      required: [title, mediaUri, mediaType, targetIds, startAt, endAt, timeZone]
+      properties:
+        title: {type: string, maxLength: 200}
+        description: {type: string, maxLength: 2000}
+        mediaUri: {type: string, format: uri}
+        mediaType: {type: string}
+        targetIds:
+          type: array
+          minItems: 1
+          items: {type: string}
+        startAt: {type: string, format: date-time}
+        endAt: {type: string, format: date-time}
+        timeZone: {type: string, description: IANA time zone}
+        brightnessPolicyId: {type: string}
+        fallbackPolicyId: {type: string}
+        contentRightsReference: {type: string}
+    ContentUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        title: {type: string, maxLength: 200}
+        description: {type: string, maxLength: 2000}
+        mediaUri: {type: string, format: uri}
+        targetIds:
+          type: array
+          items: {type: string}
+        startAt: {type: string, format: date-time}
+        endAt: {type: string, format: date-time}
+        timeZone: {type: string}
+        brightnessPolicyId: {type: string}
+        fallbackPolicyId: {type: string}
+        contentRightsReference: {type: string}
+    Content:
+      type: object
+      required: [contentId, tenantId, siteId, version, status, authorId, contentHash, createdAt]
+      properties:
+        contentId: {type: string, format: uuid}
+        tenantId: {type: string}
+        siteId: {type: string}
+        title: {type: string}
+        version: {type: integer, minimum: 1}
+        status: {$ref: '#/components/schemas/ContentStatus'}
+        authorId: {type: string}
+        contentHash: {type: string}
+        targetIds:
+          type: array
+          items: {type: string}
+        startAt: {type: string, format: date-time}
+        endAt: {type: string, format: date-time}
+        timeZone: {type: string}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    ContentPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Content'}
+        page: {type: integer}
+        pageSize: {type: integer}
+        total: {type: integer}
+    ValidationResult:
+      type: object
+      required: [passed, checks, validatedAt]
+      properties:
+        passed: {type: boolean}
+        checks:
+          type: array
+          items:
+            type: object
+            required: [name, passed]
+            properties:
+              name: {type: string}
+              passed: {type: boolean}
+              message: {type: string}
+        previewUri: {type: string, format: uri}
+        validatedAt: {type: string, format: date-time}
+    Approval:
+      type: object
+      required: [approvalId, contentId, contentVersion, authorId, status, createdAt]
+      properties:
+        approvalId: {type: string, format: uuid}
+        contentId: {type: string, format: uuid}
+        contentVersion: {type: integer}
+        authorId: {type: string}
+        approverId: {type: string}
+        status:
+          type: string
+          enum: [pending, approved, rejected, invalidated]
+        note: {type: string}
+        createdAt: {type: string, format: date-time}
+        decidedAt: {type: string, format: date-time}
+    ApprovalDecision:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [approve, reject]
+        comment: {type: string, maxLength: 2000}
+    PublishRequest:
+      type: object
+      required: [scheduleMode]
+      properties:
+        scheduleMode:
+          type: string
+          enum: [immediate, scheduled]
+        requestedStartAt: {type: string, format: date-time}
+        idempotencyKey: {type: string}
+        note: {type: string, maxLength: 1000}
+    Publication:
+      type: object
+      required: [publicationId, contentId, status, requestedAt]
+      properties:
+        publicationId: {type: string, format: uuid}
+        contentId: {type: string, format: uuid}
+        status:
+          type: string
+          enum: [requested, distributing, ready, active, revoked, failed]
+        manifestId: {type: string}
+        requestedAt: {type: string, format: date-time}
+        completedAt: {type: string, format: date-time}
+        perTargetResults:
+          type: array
+          items:
+            type: object
+            properties:
+              targetId: {type: string}
+              status:
+                type: string
+                enum: [pending, transferring, ready, active, failed, unknown]
+              message: {type: string}
+    RevokeRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: {type: string, minLength: 3, maxLength: 1000}
+    Role:
+      type: object
+      required: [name, permissions]
+      properties:
+        name: {type: string}
+        description: {type: string}
+        permissions:
+          type: array
+          items: {type: string}
+    RoleAssignment:
+      type: object
+      required: [roles, siteIds]
+      properties:
+        roles:
+          type: array
+          items: {type: string}
+        siteIds:
+          type: array
+          items: {type: string}
+    AuditEvent:
+      type: object
+      required: [eventId, actorId, action, target, timestamp, policyOutcome]
+      properties:
+        eventId: {type: string}
+        actorId: {type: string}
+        action: {type: string}
+        target: {type: string}
+        tenantId: {type: string}
+        siteId: {type: string}
+        timestamp: {type: string, format: date-time}
+        policyOutcome:
+          type: string
+          enum: [allowed, denied]
+        finalState: {type: string}
+        reason: {type: string}
+        correlationId: {type: string}
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: {type: string}
+        message: {type: string}
+        details:
+          type: array
+          items: {type: object}
+        correlationId: {type: string}
