@@ -1,0 +1,24 @@
+# Mẫu cấu hình Mosquitto 2.x có xác thực + ACL (dùng cho staging/production).
+# KHÔNG đổi tên thành mosquitto.conf khi chưa tạo passwd và aclfile thật.
+#
+# Tạo mật khẩu:
+#   docker run --rm -it -v "$PWD/deploy/mosquitto:/mosquitto/config" \
+#     eclipse-mosquitto:2.0 mosquitto_passwd -c \
+#     /mosquitto/config/passwd cloud_ingest
+#
+# Sau đó thêm từng user thiết bị/thuê bao bằng mosquitto_passwd (không dùng -c).
+
+listener 1883 0.0.0.0
+allow_anonymous false
+password_file /mosquitto/config/passwd
+acl_file /mosquitto/config/aclfile
+
+# Production nên bật TLS ở listener riêng, ví dụ:
+# listener 8883 0.0.0.0
+# cafile /mosquitto/config/ca.crt
+# certfile /mosquitto/config/server.crt
+# keyfile /mosquitto/config/server.key
+# tls_version tlsv1.2
+
+persistence true
+log_dest stdout

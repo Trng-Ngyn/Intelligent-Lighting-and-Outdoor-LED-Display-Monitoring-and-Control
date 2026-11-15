@@ -1,0 +1,44 @@
+{
+  "broker": {
+    "host": "broker.emqx.io",
+    "port": 1883,
+    "username": "",
+    "password": "",
+    "use_tls": false,
+    "client_id_prefix": "pcvsim"
+  },
+  "security": {
+    "signing_secret": "dev-only-change-me-please-32chars"
+  },
+  "simulator": {
+    "telemetry_interval_sec": 15,
+    "keep_alive_sec": 15,
+    "replay_window_ms": 30000,
+    "log_level": "INFO",
+    "crash_after_sec": null,
+    "max_devices": null
+  },
+  "devices": [
+    {
+      "site_id": "SITE_01",
+      "device_type": "light",
+      "device_id_prefix": "LGT_NODE_",
+      "count": 50,
+      "start_index": 1,
+      "index_width": 3,
+      "initial_brightness": 50
+    },
+    {
+      "site_id": "SITE_01",
+      "device_type": "led_display",
+      "device_ids": ["DSP_LED_001"],
+      "initial_brightness": 80
+    },
+    {
+      "site_id": "SITE_02",
+      "device_type": "led_display",
+      "device_ids": ["DSP_LED_002"],
+      "initial_brightness": 75
+    }
+  ]
+}

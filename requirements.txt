@@ -1,0 +1,3 @@
+# Runtime cho Virtual Edge Simulator, Mock Cloud và Core API.
+# paho-mqtt 2.x là bản hỗ trợ đầy đủ MQTT 5 (User Properties, LWT properties).
+paho-mqtt>=2.1,<3

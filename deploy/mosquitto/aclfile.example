@@ -1,0 +1,34 @@
+# ACL mẫu theo site_id/device_id cho Mosquitto 2.x.
+# Nguyên tắc: mỗi thiết bị chỉ đọc lệnh của chính nó, chỉ ghi telemetry/status/
+# alerts/result của chính nó. Cloud đọc wildcard nhưng chỉ ghi commands.
+
+# ---------- Cloud ----------
+user cloud_ingest
+topic read telemetry/v1/+/+/+
+topic read status/v1/+/+/+
+topic read alerts/v1/+/+/+
+topic read commands/v1/+/+/+/dim/result
+topic write commands/v1/+/+/+/dim
+topic write alerts/v1/+/+/+
+
+# ---------- Gateway quản lý nhiều thiết bị trong một site ----------
+user gateway_SITE_01
+topic read commands/v1/SITE_01/+/+/dim
+topic write telemetry/v1/SITE_01/+/+
+topic write status/v1/SITE_01/+/+
+topic write alerts/v1/SITE_01/+/+
+
+# ---------- Thiết bị mẫu ----------
+user dev_SITE_01_LGT_NODE_001
+topic read commands/v1/SITE_01/light/LGT_NODE_001/dim
+topic write telemetry/v1/SITE_01/light/LGT_NODE_001
+topic write status/v1/SITE_01/light/LGT_NODE_001
+topic write alerts/v1/SITE_01/light/LGT_NODE_001
+topic write commands/v1/SITE_01/light/LGT_NODE_001/dim/result
+
+user dev_SITE_01_DSP_LED_001
+topic read commands/v1/SITE_01/led_display/DSP_LED_001/dim
+topic write telemetry/v1/SITE_01/led_display/DSP_LED_001
+topic write status/v1/SITE_01/led_display/DSP_LED_001
+topic write alerts/v1/SITE_01/led_display/DSP_LED_001
+topic write commands/v1/SITE_01/led_display/DSP_LED_001/dim/result
