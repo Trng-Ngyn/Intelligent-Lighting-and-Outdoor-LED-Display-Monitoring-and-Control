@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "environment": "dev",
+  "tenant_id": "t1",
+  "site_id": "s01",
+  "gateway_id": "gw-001",
+  "message_id": "ack-000001",
+  "command_id": "cmd-000001",
+  "asset_id": "light-010",
+  "device_time": "2026-11-14T14:00:00Z",
+  "status": "verified",
+  "observed_value": 55,
+  "evidence_source": "device_feedback"
+}

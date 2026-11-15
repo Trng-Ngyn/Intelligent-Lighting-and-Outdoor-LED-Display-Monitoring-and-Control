@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "environment": "dev",
+  "tenant_id": "t1",
+  "site_id": "s01",
+  "manifest_id": "manifest-1",
+  "version": 1,
+  "player_ids": [
+    "player-001"
+  ],
+  "files": [
+    {
+      "object_key": "approved/v1/demo.mp4",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "size_bytes": 2048000,
+      "media_type": "video/mp4",
+      "width_px": 1920,
+      "height_px": 1080
+    }
+  ],
+  "author": "t1-author-sample",
+  "approver": "t1-reviewer-sample",
+  "starts_at": "2026-11-14T14:00:00Z",
+  "ends_at": "2026-11-14T14:01:00Z",
+  "time_zone": "Asia/Ho_Chi_Minh",
+  "brightness_policy": "led-p1",
+  "fallback_id": "fallback-01",
+  "revocation_version": 2
+}
