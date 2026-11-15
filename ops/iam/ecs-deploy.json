@@ -1,0 +1,23 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadOneDeploymentService",
+      "Effect": "Allow",
+      "Action": "ecs:DescribeServices",
+      "Resource": "arn:aws:ecs:AWS_REGION:AWS_ACCOUNT_ID:service/ECS_CLUSTER/ECS_SERVICE"
+    },
+    {
+      "Sid": "DeployApprovedTaskFamily",
+      "Effect": "Allow",
+      "Action": "ecs:UpdateService",
+      "Resource": "arn:aws:ecs:AWS_REGION:AWS_ACCOUNT_ID:service/ECS_CLUSTER/ECS_SERVICE",
+      "Condition": {
+        "ArnLike": {
+          "ecs:task-definition": "arn:aws:ecs:AWS_REGION:AWS_ACCOUNT_ID:task-definition/pccom-core-ENVIRONMENT:*"
+        },
+        "BoolIfExists": { "ecs:enable-execute-command": "false" }
+      }
+    }
+  ]
+}

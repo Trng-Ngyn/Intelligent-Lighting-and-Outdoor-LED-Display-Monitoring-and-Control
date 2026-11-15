@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "environment": "dev",
+  "tenant_id": "t1",
+  "site_id": "s01",
+  "gateway_id": "gw-001",
+  "message_id": "tm-000001",
+  "asset_id": "light-010",
+  "source_time": "2026-11-14T14:00:00Z",
+  "sequence": 35,
+  "metric": "active_power",
+  "value": 42.3,
+  "unit": "W",
+  "quality": "measured",
+  "firmware": "2.3.1"
+}

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "environment": "dev",
+  "tenant_id": "t1",
+  "site_id": "s01",
+  "gateway_id": "gw-001",
+  "command_id": "cmd-000001",
+  "actor": "operator-7",
+  "asset_id": "light-010",
+  "action": "set_level",
+  "value": 55,
+  "policy_version": 12,
+  "control_epoch": 3,
+  "target_rev": 101,
+  "issued_at": "2026-11-14T14:00:00Z",
+  "expires_at": "2026-11-14T14:01:00Z",
+  "priority": "normal"
+}
