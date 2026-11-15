@@ -1,0 +1,11 @@
+user gw-001
+topic write pccom/v1/t1/s01/gw-001/telemetry
+topic write pccom/v1/t1/s01/gw-001/ack
+topic read pccom/v1/t1/s01/gw-001/cmd
+topic read pccom/v1/t1/s01/gw-001/receipt
+
+user gw-002
+topic write pccom/v1/t1/s02/gw-002/telemetry
+topic write pccom/v1/t1/s02/gw-002/ack
+topic read pccom/v1/t1/s02/gw-002/cmd
+topic read pccom/v1/t1/s02/gw-002/receipt
