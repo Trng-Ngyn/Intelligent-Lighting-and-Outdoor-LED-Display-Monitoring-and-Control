@@ -7,7 +7,7 @@
 - **Cơ sở đào tạo:** Trường Đại học Giao thông Vận tải TP.HCM (UTH) — Khoa Công nghệ Thông tin
 - **Học phần:** Đồ án Học kỳ Doanh nghiệp (Enterprise Semester Capstone)
 - **Doanh nghiệp đồng hành & Thẩm định:** CÔNG TY TNHH KỸ THUẬT TIN HỌC PHÚC CHÂU (PCCOM CO., LTD)
-- **Giảng viên hướng dẫn:** ThS. Võ Tấn Sang
+- **Giảng viên hướng dẫn:** HÀN TRUNG ĐỊNH
 - **Đề tài:** Intelligent Lighting and Outdoor LED Display Monitoring and Control (Hệ thống giám sát và điều khiển chiếu sáng thông minh & màn hình LED ngoài trời)
 - **Mô hình triển khai:** Agile Scrum Framework (Sprint 2: Tuần 3 & 4, từ 11/11/2026 đến 24/11/2026)
 - **Cột mốc thẩm định hướng tới:** **Gate G1 Design Approval** (Phê duyệt hồ sơ thiết kế kiến trúc phần mềm, mô hình an ninh mạng, chuẩn hợp đồng dữ liệu, giao thức điều khiển và pipeline AI)
@@ -40,7 +40,7 @@
 | 6 | **Lê Tiến Công** | **Data Engineer** | `SCRUM-18`<br>*(PR #3)* | Thiết kế mô hình CSDL quan hệ kết hợp Time-Series (PostgreSQL + TimescaleDB); tối ưu Hypertables; chuẩn hóa 5 bộ Data Contracts JSON Schemas Annex C. | File DDL `001_init.sql` (248 dòng SQL); 5 bộ JSON Schema chuẩn Annex C (telemetry, command, audit). | **ĐÃ MERGE MAIN** |
 | 7 | **Trần Hoài Nguyên Vỹ** | **Backend Developer** | `SCRUM-19`<br>*(PR #1)* | Thiết kế đặc tả OpenAPI Specification 3.0.3 Core REST API; hạ tầng phân quyền RBAC đa cấp (4 roles); tài liệu quy trình phê duyệt nội dung LED số đa tầng. | File `SCRUM-19_OpenAPI.yaml` (556 dòng); tài liệu Word `SCRUM-19_Thiet_ke_API_RBAC_LED_Workflow.docx`. | **ĐÃ MERGE MAIN** |
 | 8 | **Đặng Nguyễn Minh Phi** | **AI & ML Developer** | `SCRUM-20` | Xây dựng quy chuẩn phân loại sự cố Fault Taxonomy F01–F04; giao thức gán nhãn Ground Truth 16.800 mẫu; thiết kế và huấn luyện mô hình học máy AI Baseline (Autoencoder & Isolation Forest). | 18 files trong `W3-ML` (code Python, dataset `pilot_50_led_labeled.csv`, weights `.keras`/`.joblib`, báo cáo đánh giá). | **ĐÃ LÊN MAIN** |
-| 9 | **Đinh Nguyễn Công Bắc** | **Frontend Developer** | `SCRUM-21`<br>*(PR #4)* | Xây dựng Web Operations Console Interactive Prototype bằng React + Vite + TypeScript; tích hợp bản đồ số GIS Leaflet, điều khiển Dimming, quản lý màn hình LED, báo cáo năng lượng. | Bộ source code hoàn chỉnh trong `src/` (hơn 30 components & pages: GISMap, Dashboard, Dimming, Alarms...). | **ĐÃ MERGE MAIN** |
+| 9 | **Đinh Nguyễn Công Bắc** | **Frontend Developer** | `SCRUM-21`<br>*(PR #4, #7)* | Xây dựng Web Operations Console Interactive Prototype bằng React + Vite + TypeScript; tích hợp bản đồ số GIS Leaflet, điều khiển Dimming, quản lý màn hình LED; bổ sung trọn bộ package.json & vite.config.ts. | Bộ source code hoàn chỉnh trong `src/` và trọn bộ file build gốc (`package.json`, `vite.config.ts`, `tsconfig.json`, `index.html`). | **ĐÃ MERGE MAIN** |
 | 10 | **Nguyễn Đại Phước** | **QA & Test Developer** | `SCRUM-22` | Lập kế hoạch kiểm thử chấp thuận Gate G1; đối chiếu ma trận truy vết yêu cầu (Traceability Matrix) từ RFP đến các tài liệu thiết kế kiến trúc và schemas; thẩm định độ phủ kiểm thử. | Tài liệu Kế hoạch kiểm thử Gate G1; Ma trận truy vết yêu cầu (Requirements Traceability Matrix - RTM). | **HOÀN THÀNH** |
 
 ---
@@ -119,4 +119,4 @@ Vào ngày 15/11/2026, toàn bộ các thành quả kỹ thuật của nhóm đ�
 
 | ĐẠI DIỆN NHÓM SINH VIÊN<br>*(Trưởng nhóm / Product Owner)* | GIẢNG VIÊN HƯỚNG DẪN<br>*(Khoa Công nghệ Thông tin)* | ĐẠI DIỆN DOANH NGHIỆP<br>*(PCCOM CO., LTD)* |
 | :---: | :---: | :---: |
-| *(Ký và ghi rõ họ tên)*<br><br><br><br>**Trần Đình Trọng** | *(Ký và ghi rõ họ tên)*<br><br><br><br>**ThS. Võ Tấn Sang** | *(Ký và ghi rõ họ tên)*<br><br><br><br>**Đại diện PCCOM CO., LTD** |
+| *(Ký và ghi rõ họ tên)*<br><br><br><br>**Trần Đình Trọng** | *(Ký và ghi rõ họ tên)*<br><br><br><br>**Hàn Trung Định** | *(Ký và ghi rõ họ tên)*<br><br><br><br>**Đại diện PCCOM CO., LTD** |
