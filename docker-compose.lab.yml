@@ -1,0 +1,81 @@
+services:
+  mqtt:
+    build:
+      context: .
+      dockerfile: lab/Dockerfile.mqtt
+      args:
+        MQTT_IMAGE: ${LAB_MQTT_IMAGE:-eclipse-mosquitto:2.0.22}
+
+    user: "${LAB_UID:?Generate lab certificates first}:${LAB_GID:?Generate lab certificates first}"
+    entrypoint: ["/usr/sbin/mosquitto"]
+    command: ["-c", "/mosquitto/config/mosquitto.conf"]
+    ports:
+      - "127.0.0.1:8883:8883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./acl.devices:/mosquitto/config/acl.devices:ro
+      - ./acl.service:/mosquitto/config/acl.service:ro
+      - ./acl.southbound:/mosquitto/config/acl.southbound:ro
+      - ./generated/mqtt:/pki:ro
+    networks:
+      default:
+        aliases: [mqtt.dev.pccom.test]
+    read_only: true
+    environment:
+      HOME: /tmp
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  edge-api:
+    image: ${LAB_NGINX_IMAGE:-nginx:1.30-alpine}
+    user: "${LAB_UID:?Generate lab certificates first}:${LAB_GID:?Generate lab certificates first}"
+    entrypoint: ["nginx"]
+    command: ["-g", "daemon off;"]
+    ports:
+      - "127.0.0.1:8443:8443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./generated/edge-api:/pki:ro
+    tmpfs: ["/tmp:mode=1777"]
+    networks:
+      default:
+        aliases: [edge-api.dev.pccom.test]
+    read_only: true
+    environment:
+      HOME: /tmp
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  mqtt-tools:
+    image: ${LAB_MQTT_IMAGE:-eclipse-mosquitto:2.0.22}
+    user: "${LAB_UID:?Generate lab certificates first}:${LAB_GID:?Generate lab certificates first}"
+    entrypoint: []
+    profiles: [test]
+    volumes:
+      - ./generated/test-clients:/clients:ro
+    read_only: true
+    environment:
+      HOME: /tmp
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  alignment-tests:
+    build:
+      context: .
+      dockerfile: lab/Dockerfile.test
+    user: "${LAB_UID:?Generate lab certificates first}:${LAB_GID:?Generate lab certificates first}"
+    profiles: [test]
+    command: ["python", "lab/check_alignment.py", "--host", "mqtt.dev.pccom.test"]
+    environment:
+      PYTHONPATH: /pccom/src
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./src:/pccom/src:ro
+      - ./contracts:/pccom/contracts:ro
+      - ./lab:/pccom/lab:ro
+      - ./generated/test-clients:/clients:ro
+    tmpfs: ["/tmp:mode=1777"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
