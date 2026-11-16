@@ -24,7 +24,7 @@
   - `watch` (kèm `--status-only`), `send-dim`, `clear-status`.
 - Hạ tầng và cấu hình:
   - `config.example.json` (50 đèn + 2 LED), `tests/fixtures/simulator.test.json`.
-  - `docker-compose.yml`, `deploy/mosquitto/mosquitto.conf`.
+  - `docker-compose.dev.yml`, `deploy/mosquitto/mosquitto.conf`.
   - Mẫu TLS/ACL: `mosquitto.secure.conf.example`, `aclfile.example`.
   - `requirements.txt`, `requirements-dev.txt`, `.env.example`, `.flake8`.
 - Kiểm thử:
@@ -40,6 +40,7 @@
 - Core API gửi lệnh theo từng thiết bị với khóa dẫn xuất riêng thay vì một khóa dùng chung.
 - `Mqtt5Client.publish` hỗ trợ `wait_for_ack` để telemetry/status không chặn luồng mạng.
 - Log được cấu hình UTF-8 trên Windows.
+- Đổi tên `docker-compose.yml` thành `docker-compose.dev.yml` cho broker simulator và cập nhật lệnh `docker compose -f` trong tài liệu.
 
 ### Fixed
 

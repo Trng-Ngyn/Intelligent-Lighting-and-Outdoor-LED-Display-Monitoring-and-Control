@@ -407,14 +407,14 @@ Khuyến nghị Cloud:
 
 Repo cung cấp:
 
-- `docker-compose.yml`: Mosquitto 2.x, cổng `1883`, cấu hình `deploy/mosquitto/mosquitto.conf`.
+- `docker-compose.dev.yml`: Mosquitto 2.x, cổng `1883` (không TLS) + WebSocket `9001`, cấu hình `deploy/mosquitto/mosquitto.conf`.
 - `deploy/mosquitto/mosquitto.secure.conf.example`: mẫu TLS 8883 + xác thực.
 - `deploy/mosquitto/aclfile.example`: mẫu ACL theo site/type/device.
 
 Chạy local:
 
 ```bash
-docker compose up -d
+docker compose -f docker-compose.dev.yml up -d
 ```
 
 Nếu dùng broker công cộng, có thể đặt `broker.emqx.io:1883` trong `config.json` cho test

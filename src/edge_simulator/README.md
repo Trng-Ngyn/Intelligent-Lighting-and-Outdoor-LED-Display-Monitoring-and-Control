@@ -179,15 +179,25 @@ Báo cáo E2E/LWT: [`docs/test_reports/MQTT5_E2E_REPORT.md`](../../docs/test_rep
 
 ---
 
-## 6. Broker local bằng Docker
+## 6. Chạy broker
+
+Broker simulator nhanh (không TLS) dùng `docker-compose.dev.yml`:
 
 ```powershell
-docker compose up -d
+docker compose -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml logs -f mosquitto
+docker compose -f docker-compose.dev.yml down
 ```
 
-Sau đó đổi `broker.host` thành `localhost` trong `config.json` (hoặc đặt
-`$env:SIM_BROKER_HOST = "localhost"`). Cấu hình Mosquitto nằm trong
+Cấu hình mở MQTT `1883` (không TLS) và WebSocket `9001`; file Mosquitto nằm trong
 [`deploy/mosquitto/`](../../deploy/mosquitto/).
+
+`compose.yml` là lab bảo mật mTLS của Tech Lead (MQTT `8883`), chạy riêng bằng
+`docker compose -f compose.yml up -d` và cần chứng chỉ/lab env theo README gốc.
+Hai cấu hình độc lập, mỗi cái dùng lệnh `-f` riêng.
+
+Sau đó đổi `broker.host` thành `localhost` trong `config.json` (hoặc đặt
+`$env:SIM_BROKER_HOST = "localhost"`).
 
 Với production, dùng TLS 8883, xác thực theo thiết bị và ACL theo site/type/device; xem
 `deploy/mosquitto/mosquitto.secure.conf.example` và `deploy/mosquitto/aclfile.example`.
@@ -211,7 +221,7 @@ Với production, dùng TLS 8883, xác thực theo thiết bị và ACL theo sit
 
 | Hiện tượng | Nguyên nhân thường gặp | Cách xử lý |
 | :--- | :--- | :--- |
-| `Không kết nối được broker` | Sai host/port, firewall, broker chưa chạy | Kiểm tra `broker.emqx.io:1883`, chạy `docker compose up -d` |
+| `Không kết nối được broker` | Sai host/port, firewall, broker chưa chạy | Kiểm tra `broker.emqx.io:1883`, chạy `docker compose -f docker-compose.dev.yml up -d` |
 | `SEC_SIGNATURE_INVALID` | Simulator và Cloud dùng master secret khác nhau | Dùng cùng `config.json` hoặc cùng `SIM_SIGNING_SECRET` |
 | `SEC_REPLAY_DETECTED` | Đồng hồ lệch quá 30 giây hoặc gửi lại cùng `correlation_id` | Đồng bộ NTP, không tái sử dụng ID |
 | Không thấy offline | Dùng `--run-seconds` (graceful) thay vì `--crash-after` | Dùng `--crash-after` và probe `watch --status-only` |

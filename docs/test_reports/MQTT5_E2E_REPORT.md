@@ -203,7 +203,7 @@ Cloud/probe nhận được trạng thái offline ngay, không phụ thuộc LWT
 1. **Broker công cộng:** `broker.emqx.io` không phù hợp production; số đo có thể dao động.
    Cần kiểm thử lại với Mosquitto local/TLS và ACL trước khi nghiệm thu.
 2. **Docker daemon chưa chạy:** chưa kiểm thử broker local trong môi trường hiện tại. Cần chạy
-   `docker compose up -d` và lặp lại kịch bản E2E/LWT.
+   `docker compose -f docker-compose.dev.yml up -d` và lặp lại kịch bản E2E/LWT.
 3. **Firmware ESP32:** PubSubClient hiện dùng MQTT 3.1.1, chưa gửi được User Properties MQTT 5.
    Cần gateway/bridge hoặc nâng cấp thư viện trước khi tích hợp phần cứng thật.
 4. **Đồng hồ thiết bị:** replay window ±30 giây yêu cầu đồng bộ NTP. Thiết bị lệch giờ sẽ bị
