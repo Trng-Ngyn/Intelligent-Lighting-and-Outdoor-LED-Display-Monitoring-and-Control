@@ -13,3 +13,16 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+
+# DevOps lab produces ephemeral PKI, runtime env and local validation state.
+/generated/
+/compose.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.csr
+*.crl
+*.crt
