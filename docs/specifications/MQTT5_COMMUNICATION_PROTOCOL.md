@@ -410,6 +410,8 @@ Repo cung cấp:
 - `docker-compose.dev.yml`: Mosquitto 2.x, cổng `1883` (không TLS) + WebSocket `9001`, cấu hình `deploy/mosquitto/mosquitto.conf`.
 - `deploy/mosquitto/mosquitto.secure.conf.example`: mẫu TLS 8883 + xác thực.
 - `deploy/mosquitto/aclfile.example`: mẫu ACL theo site/type/device.
+- Client simulator/bridge/cloud hỗ trợ mTLS qua `broker.ca_cert`, `broker.client_cert`,
+  `broker.client_key`; `broker.tls_insecure` chỉ dùng lab khi cert CN khác host kết nối.
 
 Chạy local:
 
@@ -454,6 +456,24 @@ topic write commands/v1/+/+/+/dim
 ACL thực tế phải giới hạn theo site được phân quyền, không dùng wildcard toàn hệ thống cho
 mọi tài khoản.
 
+### 3. Northbound Phương án C
+
+Gateway bridge giữ nguyên southbound cho thiết bị và thêm lớp northbound:
+
+```text
+pccom/v1/{tenant}/{site}/{gateway_id}/{category}
+category = telemetry | cmd | ack | status | alerts | receipt
+```
+
+- Gateway publish `telemetry/ack/status/alerts`, subscribe `cmd`.
+- Cloud/dispatcher subscribe `pccom/v1/{tenant}/+/+/{category}` trong phạm vi được cấp,
+  publish `cmd` đúng gateway.
+- Khóa northbound là khóa HMAC cấp gateway, không dùng khóa thiết bị.
+- Gateway offline do LWT cấp gateway; Cloud đánh dấu thiết bị con `unknown`.
+- `retain_available false` của lab yêu cầu `northbound.retain_status=false`.
+
+ACL northbound mẫu nằm tại `acl.devices` (gateway) và `acl.service` (dispatcher).
+
 ---
 
 ## XI. TƯƠNG THÍCH VÀ TRIỂN KHAI
@@ -461,9 +481,11 @@ mọi tài khoản.
 | Thành phần | Trạng thái |
 | :--- | :--- |
 | `src/iot_protocol/` (topics, signing, headers, mqtt5) | Đã triển khai, có unit test |
+| `src/iot_protocol/northbound_*` | Đã triển khai topic + canonical envelope northbound |
 | `src/edge_simulator/` | Đã triển khai MQTT 5, đa thiết bị, LWT, crash mode |
-| `src/backend/mock_cloud_service.py` | Đã triển khai xác thực envelope và gửi lệnh có ký |
-| `src/backend/core_api.py` | Đã publish lệnh MQTT 5 có ký theo từng thiết bị |
+| `src/edge_gateway_bridge/` | Đã triển khai bridge southbound ↔ northbound, LWT gateway |
+| `src/backend/mock_cloud_service.py` | Đã triển khai xác thực envelope; `--northbound` cho Phương án C |
+| `src/backend/core_api.py` | Đã publish lệnh MQTT 5; `--northbound` gửi qua gateway |
 | `tools/mqtt5_probe.py` | Watch/send-dim/clear-status |
 | Firmware ESP32 hiện tại | MQTT 3.1.1 (PubSubClient) — cần gateway/bridge hoặc nâng cấp thư viện để dùng MQTT 5 |
 
@@ -480,9 +502,15 @@ Khi chuyển firmware sang MQTT 5, cần bổ sung:
 
 | Hạng mục | Kết quả |
 | :--- | :--- |
-| Unit test protocol/config | 25 test pass |
+| Unit test protocol/config/northbound | 41 test pass |
 | E2E telemetry + command + result | Pass, `correlation_id` khớp |
 | LWT crash test | Pass, offline nhận sau khoảng 0,38 giây |
+| E2E northbound qua bridge | Pass: command/ack/telemetry/status, LWT gateway → device con `unknown` |
+| Local Mosquitto southbound + northbound | Pass: telemetry/status/command/result/ack/LWT |
+| Reject branches | Pass: expired, action sai, thiếu `requested_value`, unknown target |
+| Multi-gateway LWT | Pass: `gw-001` offline không ảnh hưởng `gw-002` |
+| Lab ACL/TLS smoke | Pass với `eclipse-mosquitto:2.0`; image `2.1.2-alpine` lỗi `Exited (139)` trên môi trường test |
+| Bridge mTLS | Pass: gateway online/offline qua cert `gw-001` + `dispatcher` |
 | Flake8/compile | Pass |
 
 Chi tiết log và số đo xem `docs/test_reports/MQTT5_E2E_REPORT.md`.
@@ -501,12 +529,17 @@ Chi tiết log và số đo xem `docs/test_reports/MQTT5_E2E_REPORT.md`.
 5. **Message Expiry 60s chỉ cho lệnh dim:** lệnh điều khiển không có ý nghĩa sau 60 giây.
 6. **Taxonomy có version `v1`:** cho phép thay đổi cấu trúc trong tương lai mà không phá
    client cũ.
+7. **Northbound Phương án C:** gateway bridge là anti-corruption layer; southbound giữ
+   nguyên, northbound dùng `pccom/v1/...` với khóa cấp gateway.
 
 ---
 
 ## XIV. TÀI LIỆU THAM CHIẾU
 
 - `src/iot_protocol/topics.py` — taxonomy và kiểm tra segment.
+- `src/iot_protocol/northbound_topics.py` — taxonomy northbound `pccom/v1/...`.
+- `src/iot_protocol/northbound_payload.py` — canonical envelope và khóa gateway.
+- `src/edge_gateway_bridge/bridge.py` — bridge southbound ↔ northbound.
 - `src/iot_protocol/signing.py` — canonical string, HMAC, dẫn xuất khóa, ReplayGuard.
 - `src/iot_protocol/headers.py` — User Properties, xác thực envelope, mã alert.
 - `src/iot_protocol/mqtt5.py` — MQTT 5 Properties cho PUBLISH/WILL/CONNECT.

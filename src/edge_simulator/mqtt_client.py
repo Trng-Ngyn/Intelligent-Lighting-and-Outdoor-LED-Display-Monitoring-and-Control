@@ -70,7 +70,17 @@ class Mqtt5Client:
         if broker.username:
             self._client.username_pw_set(broker.username, broker.password or None)
         if broker.use_tls:
-            self._client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
+            self._client.tls_set(
+                ca_certs=broker.ca_cert,
+                certfile=broker.client_cert,
+                keyfile=broker.client_key,
+                cert_reqs=ssl.CERT_REQUIRED,
+            )
+            if broker.tls_insecure:
+                self.logger.warning(
+                    "TLS hostname verification đang tắt; chỉ dùng cho lab"
+                )
+                self._client.tls_insecure_set(True)
 
     @property
     def is_connected(self) -> bool:
@@ -93,17 +103,20 @@ class Mqtt5Client:
         topic: str,
         payload: bytes | str,
         properties: Properties,
+        retain: bool = True,
     ) -> None:
-        """Cấu hình LWT: QoS 1, retain=true, Will Delay Interval = 0.
+        """Cấu hình LWT: QoS 1, Will Delay Interval = 0.
 
-        retain=true để Cloud mới subscribe vẫn thấy trạng thái offline gần
-        nhất. QoS 1 để không mất cảnh báo offline trên đường truyền yếu.
+        retain=True phù hợp broker cho phép retained status. Northbound có
+        thể đặt retain=False khi broker Tech Lead cấu hình
+        `retain_available false`; khi đó LWT vẫn được giao cho subscriber
+        đang kết nối. QoS 1 để giảm khả năng mất cảnh báo offline.
         """
         self._client.will_set(
             topic,
             payload=payload,
             qos=1,
-            retain=True,
+            retain=retain,
             properties=properties,
         )
 

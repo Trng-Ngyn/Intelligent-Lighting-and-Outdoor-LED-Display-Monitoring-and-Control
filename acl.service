@@ -1,5 +1,14 @@
+# Phương án C baseline: dispatcher đọc telemetry/ack/status/alerts, ghi cmd/receipt.
 user dispatcher
 topic read pccom/v1/t1/s01/+/telemetry
 topic read pccom/v1/t1/s01/+/ack
+topic read pccom/v1/t1/s01/+/status
+topic read pccom/v1/t1/s01/+/alerts
 topic write pccom/v1/t1/s01/+/cmd
 topic write pccom/v1/t1/s01/+/receipt
+topic read pccom/v1/t1/s02/+/telemetry
+topic read pccom/v1/t1/s02/+/ack
+topic read pccom/v1/t1/s02/+/status
+topic read pccom/v1/t1/s02/+/alerts
+topic write pccom/v1/t1/s02/+/cmd
+topic write pccom/v1/t1/s02/+/receipt

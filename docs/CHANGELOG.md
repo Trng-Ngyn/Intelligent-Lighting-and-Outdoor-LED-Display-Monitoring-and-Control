@@ -1,5 +1,41 @@
 # CHANGELOG
 
+## [1.1.0] - 2026-11-16
+
+### Added
+
+- Quyết định Phương án C và traceability RFP tại `docs/proposals/TOPIC_ALIGNMENT.md`.
+- Northbound contract `src/iot_protocol/northbound_topics.py` và canonical envelope
+  `src/iot_protocol/northbound_payload.py`.
+- Gateway bridge `src/edge_gateway_bridge/bridge.py`:
+  - Map telemetry/status/alerts/result southbound sang `pccom/v1/...`.
+  - Nhận `cmd` northbound, xác thực khóa gateway, fan-out và ký southbound.
+  - Mỗi gateway một MQTT client/LWT; `--crash-after` để kiểm thử LWT.
+- Mock Cloud `--northbound`, Core API `--northbound`; gateway offline đánh dấu
+  thiết bị con `unknown` thay vì flood offline.
+- Cấu hình `northbound` (`tenant_id`, `sites`, `gateways`, `retain_status`).
+- Hỗ trợ mTLS cho simulator/bridge/cloud: `broker.ca_cert`, `broker.client_cert`,
+  `broker.client_key`; `broker.tls_insecure` chỉ dành cho lab.
+
+### Changed
+
+- ACL gateway/dispatcher bổ sung `status`/`alerts`.
+- `Mqtt5Client.set_will` nhận `retain` để tương thích broker
+  `retain_available false`.
+
+### Tests
+
+- 41 unit test pass.
+- E2E northbound command/ack/telemetry/status và LWT gateway đã kiểm chứng với
+  `broker.emqx.io`.
+- E2E local Mosquitto: southbound đầy đủ, northbound command/ack/telemetry/status/LWT,
+  reject branches và multi-gateway LWT độc lập.
+- Lab ACL/TLS smoke pass với `LAB_MQTT_IMAGE=eclipse-mosquitto:2.0`; image mặc định
+  `eclipse-mosquitto:2.1.2-alpine` bị `Exited (139)` trên môi trường Windows/WSL Docker.
+- Bridge kết nối lab mTLS bằng cert `gw-001`, Cloud bằng `dispatcher`; gateway
+  online/offline qua LWT pass. Southbound subscribe của bridge vẫn phụ thuộc SEC 01
+  (ACL theo thiết bị chưa cấp quyền wildcard cho gateway).
+
 ## [1.0.0] - 2026-11-14
 
 ### Added

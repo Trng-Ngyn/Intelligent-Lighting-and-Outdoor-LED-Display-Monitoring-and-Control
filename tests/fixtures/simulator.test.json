@@ -10,6 +10,17 @@
   "security": {
     "signing_secret": "test-only-secret-change-me-123456"
   },
+  "northbound": {
+    "tenant_id": "t1",
+    "client_id_prefix": "pcvbridgetest",
+    "retain_status": false,
+    "sites": {
+      "SITE_TEST_01": "s01"
+    },
+    "gateways": {
+      "SITE_TEST_01": "gw-001"
+    }
+  },
   "simulator": {
     "telemetry_interval_sec": 5,
     "keep_alive_sec": 15,

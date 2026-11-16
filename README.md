@@ -59,6 +59,7 @@ An integrated IoT and cloud platform designed to monitor and manage outdoor smar
 - Đặc tả giao thức: [`docs/specifications/MQTT5_COMMUNICATION_PROTOCOL.md`](docs/specifications/MQTT5_COMMUNICATION_PROTOCOL.md)
 - Hướng dẫn simulator: [`src/edge_simulator/README.md`](src/edge_simulator/README.md)
 - Báo cáo E2E/LWT: [`docs/test_reports/MQTT5_E2E_REPORT.md`](docs/test_reports/MQTT5_E2E_REPORT.md)
+- Quyết định topic Phương án C + bridge: [`docs/proposals/TOPIC_ALIGNMENT.md`](docs/proposals/TOPIC_ALIGNMENT.md)
 - Changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 
 Chạy nhanh với broker công cộng:
