@@ -73,3 +73,5 @@ for bad_identity in revoked dispatcher; do
   fi
 done
 printf '%s\n' 'MQTT 5: valid publish, command service, cross-site denial and rejected CA/CRL checked.'
+
+"${compose[@]}" run --rm --no-deps --build -T alignment-tests
