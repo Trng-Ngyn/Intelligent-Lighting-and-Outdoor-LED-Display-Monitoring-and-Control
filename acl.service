@@ -1,5 +1,7 @@
 user dispatcher
 topic read pccom/v1/t1/s01/+/telemetry
 topic read pccom/v1/t1/s01/+/ack
+topic read pccom/v1/t1/s01/+/status
+topic read pccom/v1/t1/s01/+/alerts
 topic write pccom/v1/t1/s01/+/cmd
 topic write pccom/v1/t1/s01/+/receipt
