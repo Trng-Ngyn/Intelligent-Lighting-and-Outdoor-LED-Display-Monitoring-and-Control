@@ -63,6 +63,16 @@ class ConfigTests(unittest.TestCase):
             config = load_config(str(TEST_CONFIG))
         self.assertEqual(len(config.devices), 2)
 
+    def test_keep_alive_over_20_rejected(self) -> None:
+        # 1,5 x keep_alive phải <= 30s ngân sách phát hiện offline của LWT.
+        with patch.dict(
+            os.environ,
+            {"SIM_KEEP_ALIVE_SEC": "21"},
+            clear=False,
+        ):
+            with self.assertRaises(ConfigError):
+                load_config(str(TEST_CONFIG))
+
     def test_signing_secret_env_override(self) -> None:
         with patch.dict(
             os.environ,

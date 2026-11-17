@@ -496,6 +496,37 @@ Thiết bị vẫn chỉ đọc command và ghi telemetry/status/alert/result c�
 HMAC từng thiết bị trước khi forward. Broker không cô lập tuyệt đối từng thiết bị sau gateway;
 nếu bên mua yêu cầu broker-level per-device ACL thì phải chuyển sang phương án A/B.
 
+### 4. Quy ước topic thống nhất
+
+Hai thiết kế đang tồn tại được thống nhất thành **hai lớp**, không đổi cấu trúc topic đã triển
+khai (xem `docs/proposals/TOPIC_ALIGNMENT.md`):
+
+| Lớp | Phạm vi | Cấu trúc topic | Vai trò |
+| :--- | :--- | :--- | :--- |
+| **Southbound** | Thiết bị ↔ gateway | `{category}/v1/{site_id}/{device_type}/{device_id}` | `category` = `telemetry`, `commands`, `status`, `alerts`; giữ nguyên SCRUM-16, mỗi đèn là một MQTT client có LWT riêng |
+| **Northbound** | Gateway ↔ Cloud | `pccom/v1/{tenant}/{site}/{gateway_id}/{category}` | `category` = `telemetry`, `cmd`, `ack`, `status`, `alerts`, `receipt`; tenant/site/gateway nằm trong topic để ACL tách quyền |
+
+`src/edge_gateway_bridge/bridge.py` là **lớp chuyển đổi** duy nhất: nhận southbound, xác thực HMAC
+từng thiết bị, map sang envelope canonical rồi ký bằng khóa gateway ở northbound; chiều lệnh đi
+ngược lại (nhận `cmd`, fan-out xuống `commands/v1/.../dim`). Vì vậy `src/iot_protocol/topics.py`
+và simulator giữ nguyên, còn ACL broker phải cấp cả hai lớp (`acl.devices`, `acl.service`).
+
+**Bảng ánh xạ cũ → mới**
+
+| Nguồn | Topic cũ | Topic chuẩn | Ghi chú |
+| :--- | :--- | :--- | :--- |
+| Hào (Tech Lead) | `pccom/v1/{tenant}/{site}/{gateway_id}/{category}` | Giữ nguyên làm **northbound** | Không đổi; dùng cho gateway ↔ Cloud |
+| Kiệt (IoT) | `{category}/v1/{site_id}/{device_type}/{device_id}` | Giữ nguyên làm **southbound** | Không đổi; đúng đặc tả SCRUM-16 |
+| Firmware ESP32 (legacy) | `pccom/lighting/{SITE_ID}/{ASSET_ID}/telemetry` | `telemetry/v1/{site_id}/{device_type}/{device_id}` | `SITE_ID` → `site_id`, `ASSET_ID` → `device_id`; cần **migrate ở Phase 5** |
+| Firmware ESP32 (legacy) | `pccom/lighting/{SITE_ID}/{ASSET_ID}/heartbeat` | `status/v1/{site_id}/{device_type}/{device_id}` | Gộp vào status/LWT |
+| Firmware ESP32 (legacy) | `pccom/lighting/{SITE_ID}/{ASSET_ID}/command` | `commands/v1/{site_id}/{device_type}/{device_id}/dim` | Lệnh có hậu tố `/dim` |
+| Firmware ESP32 (legacy) | `pccom/lighting/{SITE_ID}/{ASSET_ID}/result` | `commands/v1/{site_id}/{device_type}/{device_id}/dim/result` | Dùng chung `correlation_id` với lệnh |
+
+> **Retain trên broker lab:** `mosquitto.conf` đã bật `retain_available true` để bản tin
+> `status/v1/...` retained và Will `offline` của LWT hoạt động đúng đặc tả. Chỉ status được retain;
+> telemetry/command/result/alert luôn `retain=false`. Northbound giữ `northbound.retain_status=false`
+> (non-retained) trừ khi chốt policy retained riêng.
+
 ---
 
 ## XI. TƯƠNG THÍCH VÀ TRIỂN KHAI

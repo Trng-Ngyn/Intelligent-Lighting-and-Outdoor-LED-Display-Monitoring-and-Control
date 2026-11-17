@@ -529,6 +529,13 @@ def load_config(explicit_path: Optional[str] = None) -> SimulatorConfig:
             "simulator.keep_alive_sec",
             minimum=1,
         )
+    # Broker coi client mất kết nối sau khoảng 1,5 x Keep Alive. Giới hạn 20s
+    # để bảo đảm phát hiện offline trong ngân sách 30s của đặc tả.
+    if keep_alive > 20:
+        raise ConfigError(
+            "simulator.keep_alive_sec phải <= 20 "
+            "(1.5 x keep_alive <= 30s ngân sách phát hiện offline)"
+        )
 
     replay_window = _env_int("SIM_REPLAY_WINDOW_MS")
     if replay_window is None:
