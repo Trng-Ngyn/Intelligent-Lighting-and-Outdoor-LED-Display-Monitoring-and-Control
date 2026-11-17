@@ -1,4 +1,34 @@
-# Phương án C baseline: gateway ghi telemetry/ack/status/alerts, đọc cmd/receipt.
+# Phương án C: gateway-level per-device authorization.
+# Bridge là identity riêng, được đọc telemetry/status/alerts/result của các
+# thiết bị trong site và ghi command/northbound; thiết bị vẫn chỉ dùng topic
+# của chính nó. Đây không phải broker-level per-device isolation.
+user bridge-s01
+topic read telemetry/v1/SITE_01/+/+
+topic read status/v1/SITE_01/+/+
+topic read alerts/v1/SITE_01/+/+
+topic read commands/v1/SITE_01/+/+/dim/result
+topic write commands/v1/SITE_01/+/+/dim
+topic write pccom/v1/t1/s01/gw-001/telemetry
+topic write pccom/v1/t1/s01/gw-001/ack
+topic write pccom/v1/t1/s01/gw-001/status
+topic write pccom/v1/t1/s01/gw-001/alerts
+topic read pccom/v1/t1/s01/gw-001/cmd
+topic read pccom/v1/t1/s01/gw-001/receipt
+
+user bridge-s02
+topic read telemetry/v1/SITE_02/+/+
+topic read status/v1/SITE_02/+/+
+topic read alerts/v1/SITE_02/+/+
+topic read commands/v1/SITE_02/+/+/dim/result
+topic write commands/v1/SITE_02/+/+/dim
+topic write pccom/v1/t1/s02/gw-002/telemetry
+topic write pccom/v1/t1/s02/gw-002/ack
+topic write pccom/v1/t1/s02/gw-002/status
+topic write pccom/v1/t1/s02/gw-002/alerts
+topic read pccom/v1/t1/s02/gw-002/cmd
+topic read pccom/v1/t1/s02/gw-002/receipt
+
+# Gateway credential trực tiếp (dùng cho smoke/legacy, không dùng cho bridge).
 user gw-001
 topic write pccom/v1/t1/s01/gw-001/telemetry
 topic write pccom/v1/t1/s01/gw-001/ack

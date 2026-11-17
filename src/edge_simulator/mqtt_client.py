@@ -11,6 +11,7 @@ offline trong 30s. Xem docs/specifications/MQTT5_COMMUNICATION_PROTOCOL.md.
 
 from __future__ import annotations
 
+import collections
 import logging
 import ssl
 import threading
@@ -25,6 +26,13 @@ from .config import BrokerConfig
 MessageCallback = Callable[[mqtt.MQTTMessage], None]
 ConnectCallback = Callable[[], None]
 DisconnectCallback = Callable[[], None]
+
+
+def _reason_value(reason_code: object) -> int:
+    """Chuẩn hóa ReasonCode/int của paho về số nguyên."""
+    if reason_code is None:
+        return 0
+    return int(getattr(reason_code, "value", reason_code))
 
 
 class MqttConnectionError(RuntimeError):
@@ -55,6 +63,15 @@ class Mqtt5Client:
         self._stopping = False
         self._keep_alive_sec = 0
 
+        # MQTT 5 trả reason code trong PUBACK/SUBACK. Paho không đưa các mã
+        # này vào MQTTMessageInfo, nên phải giữ lại để publish() biết ACL có
+        # từ chối hay không thay vì coi mọi lần gửi là thành công.
+        self._ack_lock = threading.Lock()
+        self._ack_events: dict[int, threading.Event] = {}
+        self._ack_reasons: dict[int, int] = {}
+        self._ack_order: collections.deque[int] = collections.deque()
+        self._subscribe_topics: dict[int, list[str]] = {}
+
         self._client = mqtt.Client(
             callback_api_version=CallbackAPIVersion.VERSION2,
             client_id=client_id,
@@ -63,6 +80,8 @@ class Mqtt5Client:
         self._client.on_connect = self._handle_connect
         self._client.on_disconnect = self._handle_disconnect
         self._client.on_message = self._handle_message
+        self._client.on_publish = self._handle_publish
+        self._client.on_subscribe = self._handle_subscribe
         # Tự kết nối lại khi mạng chập chờn; LWT của kết nối cũ đã được broker
         # phát, kết nối mới sẽ publish lại trạng thái online retained.
         self._client.reconnect_delay_set(min_delay=1, max_delay=30)
@@ -167,6 +186,7 @@ class Mqtt5Client:
                 mid,
             )
             return
+        self._subscribe_topics[mid] = [topic]
         self.logger.info("Đã subscribe topic=%s qos=%s mid=%s", topic, qos, mid)
 
     def publish(
@@ -202,10 +222,46 @@ class Mqtt5Client:
             return False
         if not wait_for_ack:
             return True
-        try:
-            info.wait_for_publish(timeout=wait_timeout_sec)
-        except (ValueError, RuntimeError) as exc:
-            self.logger.error("Publish chưa hoàn tất topic=%s: %s", topic, exc)
+        if qos == 0:
+            try:
+                info.wait_for_publish(timeout=wait_timeout_sec)
+            except (ValueError, RuntimeError) as exc:
+                self.logger.error("Publish chưa hoàn tất topic=%s: %s", topic, exc)
+                return False
+            return True
+
+        ack_event = threading.Event()
+        with self._ack_lock:
+            self._ack_events[info.mid] = ack_event
+            early_reason = self._ack_reasons.pop(info.mid, None)
+            if early_reason is not None:
+                ack_event.set()
+        if not ack_event.wait(wait_timeout_sec):
+            with self._ack_lock:
+                self._ack_events.pop(info.mid, None)
+            self.logger.error(
+                "Publish timeout chờ PUBACK topic=%s mid=%s",
+                topic,
+                info.mid,
+            )
+            return False
+        with self._ack_lock:
+            reason = self._ack_reasons.pop(info.mid, None)
+            self._ack_events.pop(info.mid, None)
+        if reason is None:
+            self.logger.error(
+                "Publish không nhận được PUBACK topic=%s mid=%s",
+                topic,
+                info.mid,
+            )
+            return False
+        if reason >= 0x80:
+            self.logger.error(
+                "PUBACK từ chối topic=%s mid=%s reason=%s",
+                topic,
+                info.mid,
+                reason,
+            )
             return False
         return True
 
@@ -220,6 +276,68 @@ class Mqtt5Client:
         finally:
             self._client.loop_stop()
             self._connected.clear()
+
+    def _handle_publish(
+        self,
+        client: mqtt.Client,
+        userdata: object,
+        mid: int,
+        reason_code: mqtt.ReasonCode,
+        properties: Optional[Properties],
+    ) -> None:
+        """Ghi nhận PUBACK/PUBCOMP và đánh thức publish() đang chờ."""
+        reason = _reason_value(reason_code)
+        with self._ack_lock:
+            self._ack_reasons[mid] = reason
+            self._ack_order.append(mid)
+            while len(self._ack_order) > 512:
+                stale_mid = self._ack_order.popleft()
+                if stale_mid in self._ack_events:
+                    # Còn publish đang chờ; giữ reason lại cho waiter.
+                    self._ack_order.append(stale_mid)
+                    break
+                self._ack_reasons.pop(stale_mid, None)
+            event = self._ack_events.get(mid)
+            if event is not None:
+                event.set()
+        if reason >= 0x80:
+            self.logger.error(
+                "PUBACK/PUBCOMP từ chối mid=%s reason=%s", mid, reason
+            )
+        else:
+            self.logger.debug("PUBACK/PUBCOMP mid=%s reason=%s", mid, reason)
+
+    def _handle_subscribe(
+        self,
+        client: mqtt.Client,
+        userdata: object,
+        mid: int,
+        reason_code_list: list[mqtt.ReasonCode],
+        properties: Optional[Properties],
+    ) -> None:
+        """Log SUBACK reason code để phát hiện ACL từ chối subscribe."""
+        topics = self._subscribe_topics.pop(mid, [])
+        codes = (
+            reason_code_list
+            if isinstance(reason_code_list, list)
+            else [reason_code_list]
+        )
+        for topic, reason_code in zip(topics, codes):
+            reason = _reason_value(reason_code)
+            if reason >= 0x80:
+                self.logger.error(
+                    "SUBACK từ chối topic=%s mid=%s reason=%s",
+                    topic,
+                    mid,
+                    reason,
+                )
+            else:
+                self.logger.info(
+                    "SUBACK chấp nhận topic=%s mid=%s qos=%s",
+                    topic,
+                    mid,
+                    reason,
+                )
 
     def _handle_connect(
         self,

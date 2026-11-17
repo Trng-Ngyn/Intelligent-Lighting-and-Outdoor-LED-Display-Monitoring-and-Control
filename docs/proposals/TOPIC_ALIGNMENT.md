@@ -28,7 +28,7 @@
 | ARC 02, dòng 373 | Adapter nhà cung cấp chuẩn hóa từng họ thiết bị vào hợp đồng dự án; MQTT chỉ là transport. | Bridge của C chính là adapter; cloud không bị coupling vào taxonomy thiết bị. |
 | Dòng 446, 540, 545 | Phải **tương quan mất gateway** thành sự cố hạ tầng, không tràn ngập cảnh báo từng tài sản con. | C có gateway-level LWT/status; device con chuyển `unknown/stale` thay vì `offline` giả. |
 | Dòng 45 | Góc nhìn vận hành duy nhất bao gồm **gateway**. | Gateway là first-class asset trong northbound. |
-| SEC 01, dòng 165 | Định danh thiết bị duy nhất và phân quyền theo từng thiết bị; không dùng mật khẩu mặc định dùng chung. | C giữ device identity ở southbound/payload; gateway thực thi per-device authz. Nếu bên mua yêu cầu broker-level per-device ACL thì mới cần A/B. |
+| SEC 01, dòng 165 | Định danh thiết bị duy nhất và phân quyền theo từng thiết bị; không dùng mật khẩu mặc định dùng chung. | C giữ device identity ở southbound/payload; bridge có identity riêng và gateway thực thi per-device authz. Nếu bên mua yêu cầu broker-level per-device ACL thì mới cần A/B. |
 | LGT 01/02, dòng 87-88; CTL 01/02, dòng 385-387 | Phân biệt commanded/reported/unknown; `ack` tách khỏi trạng thái vật lý đã xác minh; chống replay/idempotency. | C tách `cmd` / `ack` / `status`; `command_id` xuyên suốt. |
 | LGT 06, dòng 92; OPS 01, dòng 170 | Cảnh báo sự cố và giám sát availability. | C có nhánh `alerts` và status theo thiết bị/gateway. |
 | OPS 02, dòng 171; AT 05, dòng 193 | Đệm telemetry 24h, đối soát trùng và lệnh hết hạn sau mất WAN. | C có gateway spool, sequence và `receipt`/reconciliation. |
@@ -357,7 +357,7 @@ Lưu ý:
 
 - ACL trên chỉ minh họa; production phải tách theo tenant/site thực tế, không dùng literal `t1` cho mọi tenant.
 - Nếu bật retained cho `status`, phải đổi `retain_available false` (`mosquitto.conf:3`) thành `true` và giới hạn retain đúng nhánh status.
-- Bridge cần credential riêng; không dùng credential gateway cho bridge và không cấp cho thiết bị quyền ghi northbound.
+- Bridge cần credential riêng; không dùng credential gateway cho bridge và không cấp cho thiết bị quyền ghi northbound. Đã triển khai identity `bridge-s01`/`bridge-s02` trong `generate-pki.sh` và `acl.devices`.
 - Southbound ACL giữ theo `deploy/mosquitto/aclfile.example` (có thể thêm tenant nếu broker southbound dùng chung).
 
 ### 6.4. C chuẩn hóa (C+) — đích dài hạn
@@ -390,7 +390,8 @@ Trong đó `category` gồm `telemetry`, `cmd`, `ack`, `status`, `alerts`; `rece
 | Thành phần | File | Hành vi |
 | :--- | :--- | :--- |
 | Canonical envelope + khóa gateway | `src/iot_protocol/northbound_payload.py` | `build_envelope`, `parse_envelope`, `derive_gateway_key`, `command_target`, `normalize_ack_status` |
-| Gateway bridge | `src/edge_gateway_bridge/bridge.py` | Mỗi gateway một MQTT client/LWT; subscribe telemetry/status/alerts/result southbound; publish telemetry/status/ack/alerts northbound; nhận `cmd` và fan-out |
+| Gateway bridge | `src/edge_gateway_bridge/bridge.py` | Mỗi gateway một MQTT client/LWT; subscribe telemetry/status/alerts/result southbound; publish telemetry/status/ack/alerts northbound; nhận `cmd` và fan-out; command xử lý trên worker thread để chờ PUBACK |
+| Bridge identity | `generate-pki.sh`, `acl.devices`, `deploy/mosquitto/aclfile.example` | `bridge-s01`/`bridge-s02` có cert riêng, đọc wildcard trong site và ghi command/northbound; không dùng credential gateway |
 | Northbound Mock Cloud | `src/backend/mock_cloud_service.py --northbound` | Subscribe `pccom/v1/{tenant}/+/+/{category}`; xác thực khóa gateway; gateway offline → device con `unknown` |
 | Northbound Core API | `src/backend/core_api.py --northbound` | Gửi lệnh `cmd` qua gateway, giữ `command_id` xuyên suốt |
 | Mapping cấu hình | `src/edge_simulator/config.py`, `config.example.json` | `northbound.tenant_id`, `sites`, `gateways`, `client_id_prefix`, `retain_status` |
@@ -418,6 +419,16 @@ Bằng chứng E2E ngày 16/11/2026 với `tests/fixtures/simulator.test.json`:
 - Crash bridge (`--crash-after`) → Cloud nhận `GATEWAY_STATUS gateway=gw-001 status=offline affected_devices=3`; không phát offline giả cho từng thiết bị.
 - Bridge từ chối lệnh hết hạn/không hỗ trợ bằng `ack rejected`, giữ `command_id` để Cloud đối soát.
 - `retain_status=false` giữ tương thích `retain_available false`; status không retained. Khi cần retained status phải bật đồng thời cấu hình broker và `northbound.retain_status`.
+
+Bằng chứng SEC 01 ngày 17/11/2026 (lab mTLS):
+
+- `smoke.sh` xác nhận `bridge-s01` được ghi `commands/v1/.../dim` và `pccom/.../status`,
+  bị chặn `RC:135` khi ghi telemetry thiết bị hoặc topic site khác.
+- Full E2E: fake device `LGT_LAB_001` (cert `gw-001`, ACL lab tạm) → bridge `bridge-s01` →
+  Cloud `dispatcher`; telemetry/status/command/ack pass với `status=executed`, `observed=42`,
+  cùng `command_id`.
+- PUBACK/SUBACK `>= 0x80` được coi là thất bại; có regression test với `paho.mqtt.ReasonCode`.
+- Bridge publish command trên worker thread, không chặn luồng mạng paho khi chờ PUBACK.
 
 ---
 
@@ -451,18 +462,18 @@ Bằng chứng E2E ngày 16/11/2026 với `tests/fixtures/simulator.test.json`:
 3. ACL `status`/`alerts` đã bổ sung ở Phase 1; LWT/status từng đèn do gateway tổng hợp từ southbound.
 4. `tenant` dùng slug trong cấu hình (`t1` mặc định); map `sites`/`gateways` khai báo tường minh.
 5. `device_type`/`device_id` nằm trong payload northbound; topic giữ cấp gateway.
-6. Bridge do nhóm IoT làm tại `src/edge_gateway_bridge/`; SEC 01 hiện hiểu là gateway-level per-device authorization.
+6. Bridge do nhóm IoT làm tại `src/edge_gateway_bridge/`; SEC 01 chốt gateway-level per-device authorization: bridge có identity riêng `bridge-s01`/`bridge-s02`, xác thực HMAC từng thiết bị, không dùng credential gateway.
 7. Chấp nhận offline từng đèn trễ tối đa 30 giây; device con chuyển `unknown` khi gateway mất.
 8. Client simulator/bridge/cloud hỗ trợ mTLS (`broker.ca_cert`, `broker.client_cert`,
-   `broker.client_key`); lab smoke ACL/TLS pass với `eclipse-mosquitto:2.0`. Bridge mTLS đã
-   kiểm chứng status/LWT bằng cert `gw-001`; southbound qua bridge vẫn chờ chốt SEC 01.
+   `broker.client_key`); lab smoke ACL/TLS pass với `eclipse-mosquitto:2.0`. Full E2E mTLS
+   với `bridge-s01` + thiết bị + Cloud `dispatcher` đã pass.
 
 **Còn cần xác nhận trước go-live:**
 
 - Retain status: có bật `retain_available` và `northbound.retain_status` hay không.
-- SEC 01 có bắt buộc broker-level per-device ACL hay chấp nhận gateway-level.
 - Chọn canonical contract giữa `contracts/` và `docs/data_contracts/`.
 - Phạm vi spool 24h, duplicate reconciliation và `receipt`.
+- Có cần broker-level per-device isolation bổ sung ngoài gateway-level authorization không.
 
 ---
 
@@ -472,7 +483,7 @@ Bằng chứng E2E ngày 16/11/2026 với `tests/fixtures/simulator.test.json`:
 | :--- | :--- | :--- |
 | **0. Chốt quyết định** | Chốt C, traceability RFP, baseline topic | Tài liệu này được review và chấp thuận |
 | **1. Northbound contract** | Đã thêm `status`/`alerts` vào ACL gateway/dispatcher; định nghĩa builder/parser northbound; giữ nguyên southbound | Unit test topic pass; ACL đã cập nhật; smoke mTLS lab pass |
-| **2. Bridge gateway** | **Đã triển khai** tại `src/edge_gateway_bridge/bridge.py`; map telemetry/status/alerts/result; nhận `cmd` và fan-out; phát `ack` | E2E simulator → bridge → mock cloud local + `broker.emqx.io` pass; command_id/ack khớp; bridge mTLS status/LWT pass |
+| **2. Bridge gateway** | **Đã triển khai** tại `src/edge_gateway_bridge/bridge.py`; map telemetry/status/alerts/result; nhận `cmd` và fan-out; phát `ack` | E2E simulator → bridge → mock cloud local + `broker.emqx.io` pass; command_id/ack khớp; full mTLS `bridge-s01` pass |
 | **3. Failure & offline** | Gateway LWT + device con `unknown` đã có; còn timeout per-device ≤30s, spool 24h, duplicate reconciliation, `receipt` optional | Test mất WAN 24h, gateway restart, mất điện, reconnect pass |
 | **4. Canonical & scale** | Canonical envelope đã có (`northbound_payload.py`); còn schema registry, contract test, load 10.100 tài sản, dead letter | AT 01/02/03/05 và NFR 01 có bằng chứng |
 | **5. Chuẩn hóa dài hạn** | Tenant-first cả hai lớp; `pccom/edge/v1` + `pccom/cloud/v1`; direct-device qua logical gateway | Không còn legacy `pccom/lighting/...`; tài liệu vận hành cập nhật |

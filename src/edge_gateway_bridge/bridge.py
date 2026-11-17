@@ -23,6 +23,7 @@ import argparse
 import json
 import logging
 import os
+import queue
 import sys
 import threading
 import time
@@ -198,6 +199,11 @@ class GatewayLink:
             on_message=self._handle_message,
             on_disconnect=self._handle_disconnect,
         )
+        # Publish command cần chờ PUBACK để phát hiện ACL deny. Không được
+        # chờ trong callback on_message vì callback chạy trên luồng mạng của
+        # paho; chờ PUBACK tại đó sẽ làm luồng mạng không đọc được PUBACK.
+        self._command_queue: queue.Queue[Any] = queue.Queue()
+        self._command_worker: Optional[threading.Thread] = None
 
     def _gateway_status_envelope(self, status: str) -> dict[str, Any]:
         """Tạo envelope status cấp gateway."""
@@ -215,6 +221,12 @@ class GatewayLink:
 
     def start(self) -> None:
         """Đăng ký LWT gateway rồi kết nối broker."""
+        self._command_worker = threading.Thread(
+            target=self._command_worker_loop,
+            name=f"bridge-command-{self.gateway_id}",
+            daemon=True,
+        )
+        self._command_worker.start()
         offline_payload = encode_envelope(
             self._gateway_status_envelope("offline")
         )
@@ -341,7 +353,7 @@ class GatewayLink:
         """Phân luồng message northbound cmd và southbound telemetry/status."""
         topic = message.topic
         if topic == self.command_topic:
-            self._handle_command(message)
+            self._command_queue.put(message)
             return
 
         try:
@@ -405,6 +417,19 @@ class GatewayLink:
                 spec.device_id,
                 exc,
             )
+
+    def _command_worker_loop(self) -> None:
+        """Xử lý command ngoài luồng mạng để publish có thể chờ PUBACK."""
+        while True:
+            message = self._command_queue.get()
+            try:
+                if message is None:
+                    return
+                self._handle_command(message)
+            except Exception:  # pragma: no cover - lỗi một command không dừng worker
+                self.logger.exception("Lỗi xử lý command northbound")
+            finally:
+                self._command_queue.task_done()
 
     def _forward_southbound(
         self,
@@ -831,6 +856,10 @@ class GatewayLink:
 
     def stop(self, graceful: bool = True) -> None:
         """Publish offline rồi ngắt kết nối nếu dừng chủ động."""
+        if self._command_worker is not None:
+            self._command_queue.put(None)
+            self._command_worker.join(timeout=10)
+            self._command_worker = None
         if graceful and self.client.is_connected:
             offline_payload = encode_envelope(
                 self._gateway_status_envelope("offline")

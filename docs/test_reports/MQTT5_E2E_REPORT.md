@@ -246,18 +246,19 @@ MQTT 5.
 
 > **Ngày kiểm thử:** 16/11/2026
 > **Broker local:** `eclipse-mosquitto:2.0`, `docker-compose.dev.yml`
-> **Lab:** `eclipse-mosquitto:2.0` listener `8883`/`8884`, cert `gw-001` và `dispatcher`
-> **Kết quả tổng hợp:** PASS, còn các mục mở tại IX.5/IX.6
+> **Lab:** `eclipse-mosquitto:2.0` listener `8883`/`8884`, cert `gw-001`, `bridge-s01` và `dispatcher`
+> **Kết quả tổng hợp:** PASS; SEC 01 chốt gateway-level per-device authorization
 
 ### 1. Unit test và chất lượng mã
 
 ```text
-Ran 41 tests in 0.017s
+Ran 47 tests in 0.044s
 OK
 ```
 
 `flake8` cho `src/edge_simulator/config.py`, `src/edge_simulator/mqtt_client.py`,
-`tests/test_simulator_config.py` và CI selector `E9,F63,F7,F82` đều pass.
+`src/edge_gateway_bridge/bridge.py`, `tests/test_simulator_config.py`,
+`tests/test_mqtt_client.py` và CI selector `E9,F63,F7,F82` đều pass.
 
 ### 2. Local southbound
 
@@ -283,7 +284,10 @@ Bridge crash phát gateway `offline`; Cloud đánh dấu thiết bị con `unkno
 
 ```text
 API: authorized cert; unknown serial, missing/revoked cert, wrong CA and hostname checked.
-MQTT 5: valid publish, command service, cross-site denial and rejected CA/CRL checked.
+Client bridge-s01 received PUBACK (Mid: 1, RC:16)
+Warning: Publish 1 failed: Not authorized.
+Client bridge-s01 received PUBACK (Mid: 1, RC:135)
+MQTT 5: valid publish, command service, bridge ACL, cross-site denial and rejected CA/CRL checked.
 ```
 
 Các điểm phát hiện:
@@ -296,24 +300,46 @@ Các điểm phát hiện:
   `broker.tls_insecure=true` hoặc thêm hosts entry.
 - `RC:16` là PUBACK không có subscriber nhưng được phép; `RC:135` là Not authorized, đúng cho
   cross-site/denied.
+- `bridge-s01` được phép ghi `commands/v1/SITE_01/.../dim` và
+  `pccom/v1/t1/s01/gw-001/status`, nhưng bị chặn khi ghi telemetry thiết bị hoặc topic của site
+  khác. Đây là kiểm chứng cho SEC 01 gateway-level authorization.
 
-### 6. Bridge/Cloud qua mTLS
+### 6. SEC 01 — Bridge identity riêng và full mTLS E2E
 
-Bridge kết nối listener `8883` bằng cert `gw-001`; Cloud kết nối listener `8884` (map host
-`18884`) bằng cert `dispatcher`. Kết quả:
+SEC 01 được xử lý theo hướng **gateway-level per-device authorization**:
+
+- Bridge dùng identity riêng `bridge-s01`/`bridge-s02` (cert riêng do `generate-pki.sh` cấp),
+  không dùng credential của `gw-001`.
+- ACL cho bridge đọc wildcard telemetry/status/alerts/result trong site, ghi command và
+  northbound `pccom/v1/...` của gateway tương ứng.
+- Thiết bị vẫn chỉ đọc command và ghi telemetry/status/alert/result của chính nó.
+- Bridge tiếp tục xác thực HMAC từng thiết bị. Broker không cô lập tuyệt đối từng thiết bị sau
+  gateway; đây là residual risk đã chấp nhận, không phải broker-level per-device ACL.
+
+Full E2E qua mTLS với Cloud cert `dispatcher`, bridge cert `bridge-s01`, fake device cert
+`gw-001` (ACL tạm chỉ trong lab):
 
 ```text
-bridge: Đã kết nối MQTT 5 broker=127.0.0.1:8883 client_id=pcvlab-t1-s01-gw-001
-cloud:  GATEWAY_STATUS gateway=gw-001 status=online affected_devices=2
-cloud:  GATEWAY_STATUS gateway=gw-001 status=offline affected_devices=2
+device: PUBLISH telemetry topic=telemetry/v1/SITE_01/light/LGT_LAB_001 ok=True
+bridge: TELEMETRY_FORWARD device=LGT_LAB_001
+cloud:  TELEMETRY_RX gateway=gw-001 device=LGT_LAB_001
+cloud:  COMMAND_TX gateway=gw-001 device=LGT_LAB_001 value=42
+bridge: COMMAND_RX command_id=... device=LGT_LAB_001
+bridge: ACK_TX command_id=... status=executed observed=42
 ```
 
-Bridge crash không DISCONNECT, broker phát Will; Cloud nhận gateway `offline` sau khoảng 8 giây.
+`Mqtt5Client` xử lý PUBACK/SUBACK reason code `>= 0x80` là thất bại nên ACL deny không còn bị
+coi là publish thành công. Paho `ReasonCode` không `int()` trực tiếp; code dùng helper
+`_reason_value` đọc `.value`. Command được đẩy sang worker thread trước khi publish chờ PUBACK,
+tránh deadlock vì callback `on_message` chạy trên luồng mạng của paho.
 
-**Giới hạn:** ACL lab cấp quyền southbound theo từng thiết bị, không cấp wildcard cho gateway;
-vì vậy bridge subscribe southbound bị từ chối và chưa thể chạy full command/telemetry qua mTLS.
-Đây là cùng điểm mở **SEC 01**: cần chốt gateway-level per-device authorization hoặc broker-level
-per-device ACL.
+```text
+Ran 47 tests in 0.044s
+OK
+```
+
+**Giới hạn còn lại:** broker vẫn không cô lập từng thiết bị con; retained status/stale offline,
+spool 24h, idempotency/receipt và load test chưa hoàn thiện.
 
 ### 7. Log Phase 2
 
@@ -336,5 +362,6 @@ per-device ACL.
 ### 8. Kết luận Phase 2
 
 Runtime Phương án C đã pass local southbound, local northbound, reject branches,
-multi-gateway LWT và lab ACL/TLS. Hai việc còn mở trước nghiệm thu đầy đủ là SEC 01
-(gateway đọc telemetry/command của thiết bị con dưới ACL per-device) và chốt canonical contract.
+multi-gateway LWT, lab ACL/TLS và full mTLS E2E với bridge identity riêng.
+SEC 01 đã chốt theo gateway-level per-device authorization. Việc còn mở trước nghiệm thu đầy đủ
+là canonical contract, retained status/stale offline policy, spool/idempotency và load test.

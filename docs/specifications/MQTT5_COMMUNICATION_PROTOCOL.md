@@ -472,7 +472,29 @@ category = telemetry | cmd | ack | status | alerts | receipt
 - Gateway offline do LWT cấp gateway; Cloud đánh dấu thiết bị con `unknown`.
 - `retain_available false` của lab yêu cầu `northbound.retain_status=false`.
 
-ACL northbound mẫu nằm tại `acl.devices` (gateway) và `acl.service` (dispatcher).
+ACL northbound mẫu nằm tại `acl.devices` (gateway/bridge) và `acl.service` (dispatcher).
+
+**SEC 01 — gateway-level per-device authorization.** Bridge là identity riêng
+(`bridge-s01`, `bridge-s02`), không dùng credential của thiết bị/gateway:
+
+```text
+user bridge-s01
+topic read  telemetry/v1/SITE_01/+/+
+topic read  status/v1/SITE_01/+/+
+topic read  alerts/v1/SITE_01/+/+
+topic read  commands/v1/SITE_01/+/+/dim/result
+topic write commands/v1/SITE_01/+/+/dim
+topic write pccom/v1/t1/s01/gw-001/telemetry
+topic write pccom/v1/t1/s01/gw-001/ack
+topic write pccom/v1/t1/s01/gw-001/status
+topic write pccom/v1/t1/s01/gw-001/alerts
+topic read  pccom/v1/t1/s01/gw-001/cmd
+topic read  pccom/v1/t1/s01/gw-001/receipt
+```
+
+Thiết bị vẫn chỉ đọc command và ghi telemetry/status/alert/result của chính nó. Bridge xác thực
+HMAC từng thiết bị trước khi forward. Broker không cô lập tuyệt đối từng thiết bị sau gateway;
+nếu bên mua yêu cầu broker-level per-device ACL thì phải chuyển sang phương án A/B.
 
 ---
 
@@ -502,7 +524,7 @@ Khi chuyển firmware sang MQTT 5, cần bổ sung:
 
 | Hạng mục | Kết quả |
 | :--- | :--- |
-| Unit test protocol/config/northbound | 41 test pass |
+| Unit test protocol/config/northbound | 47 test pass |
 | E2E telemetry + command + result | Pass, `correlation_id` khớp |
 | LWT crash test | Pass, offline nhận sau khoảng 0,38 giây |
 | E2E northbound qua bridge | Pass: command/ack/telemetry/status, LWT gateway → device con `unknown` |
@@ -510,7 +532,9 @@ Khi chuyển firmware sang MQTT 5, cần bổ sung:
 | Reject branches | Pass: expired, action sai, thiếu `requested_value`, unknown target |
 | Multi-gateway LWT | Pass: `gw-001` offline không ảnh hưởng `gw-002` |
 | Lab ACL/TLS smoke | Pass với `eclipse-mosquitto:2.0`; image `2.1.2-alpine` lỗi `Exited (139)` trên môi trường test |
-| Bridge mTLS | Pass: gateway online/offline qua cert `gw-001` + `dispatcher` |
+| Bridge ACL | Pass: `bridge-s01` ghi command/northbound, bị chặn telemetry/cross-site |
+| Full mTLS E2E | Pass: `bridge-s01` → thiết bị → bridge → Cloud `dispatcher`; ack `executed`, `observed=42` |
+| Reason code MQTT 5 | Pass: PUBACK/SUBACK `>= 0x80` bị coi là thất bại; có regression test |
 | Flake8/compile | Pass |
 
 Chi tiết log và số đo xem `docs/test_reports/MQTT5_E2E_REPORT.md`.
@@ -531,6 +555,9 @@ Chi tiết log và số đo xem `docs/test_reports/MQTT5_E2E_REPORT.md`.
    client cũ.
 7. **Northbound Phương án C:** gateway bridge là anti-corruption layer; southbound giữ
    nguyên, northbound dùng `pccom/v1/...` với khóa cấp gateway.
+8. **SEC 01 — gateway-level per-device authorization:** bridge có identity riêng, đọc
+   wildcard trong site và xác thực HMAC từng thiết bị; không dùng credential gateway cho
+   bridge và không hứa broker-level per-device isolation.
 
 ---
 

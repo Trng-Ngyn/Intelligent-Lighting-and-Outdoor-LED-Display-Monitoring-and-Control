@@ -16,25 +16,34 @@
 - Cấu hình `northbound` (`tenant_id`, `sites`, `gateways`, `retain_status`).
 - Hỗ trợ mTLS cho simulator/bridge/cloud: `broker.ca_cert`, `broker.client_cert`,
   `broker.client_key`; `broker.tls_insecure` chỉ dành cho lab.
+- SEC 01 theo gateway-level per-device authorization:
+  - Bridge có identity riêng `bridge-s01`/`bridge-s02`; `generate-pki.sh` cấp cert riêng.
+  - `acl.devices` cấp bridge đọc wildcard southbound trong site, ghi command và northbound,
+    không dùng credential gateway cho bridge.
+  - `deploy/mosquitto/aclfile.example` bổ sung mẫu bridge identity.
+- `Mqtt5Client` xử lý PUBACK/SUBACK reason code `>= 0x80` là thất bại; helper
+  `_reason_value` chuẩn hóa paho `ReasonCode` (không `int()` trực tiếp).
+- Bridge xử lý command trên worker thread để publish chờ PUBACK không deadlock luồng mạng paho.
 
 ### Changed
 
-- ACL gateway/dispatcher bổ sung `status`/`alerts`.
+- ACL gateway/dispatcher bổ sung `status`/`alerts`; `smoke.sh` kiểm tra bridge ACL.
 - `Mqtt5Client.set_will` nhận `retain` để tương thích broker
   `retain_available false`.
 
 ### Tests
 
-- 41 unit test pass.
+- 47 unit test pass, gồm regression reason code dùng `paho.mqtt.ReasonCode` thật.
 - E2E northbound command/ack/telemetry/status và LWT gateway đã kiểm chứng với
   `broker.emqx.io`.
 - E2E local Mosquitto: southbound đầy đủ, northbound command/ack/telemetry/status/LWT,
   reject branches và multi-gateway LWT độc lập.
 - Lab ACL/TLS smoke pass với `LAB_MQTT_IMAGE=eclipse-mosquitto:2.0`; image mặc định
   `eclipse-mosquitto:2.1.2-alpine` bị `Exited (139)` trên môi trường Windows/WSL Docker.
-- Bridge kết nối lab mTLS bằng cert `gw-001`, Cloud bằng `dispatcher`; gateway
-  online/offline qua LWT pass. Southbound subscribe của bridge vẫn phụ thuộc SEC 01
-  (ACL theo thiết bị chưa cấp quyền wildcard cho gateway).
+- Full mTLS E2E: bridge `bridge-s01` → thiết bị → bridge → Cloud `dispatcher`;
+  telemetry/status/command/ack pass, `status=executed`, `observed=42`.
+- Bridge LWT gateway offline qua mTLS pass. Broker-level per-device isolation vẫn là
+  residual risk đã chấp nhận.
 
 ## [1.0.0] - 2026-11-14
 
