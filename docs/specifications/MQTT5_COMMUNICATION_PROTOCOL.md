@@ -470,7 +470,8 @@ category = telemetry | cmd | ack | status | alerts | receipt
   publish `cmd` đúng gateway.
 - Khóa northbound là khóa HMAC cấp gateway, không dùng khóa thiết bị.
 - Gateway offline do LWT cấp gateway; Cloud đánh dấu thiết bị con `unknown`.
-- `retain_available false` của lab yêu cầu `northbound.retain_status=false`.
+- Broker lab đã bật `retain_available true`; `northbound.retain_status` vẫn giữ `false`
+  theo policy hiện tại (xem mục 4).
 
 ACL northbound mẫu nằm tại `acl.devices` (gateway/bridge) và `acl.service` (dispatcher).
 
