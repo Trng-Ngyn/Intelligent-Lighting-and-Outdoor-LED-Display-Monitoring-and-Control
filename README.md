@@ -47,13 +47,21 @@ An integrated IoT and cloud platform designed to monitor and manage outdoor smar
 │   └── weekly_reports/     # Báo cáo tiến độ hàng tuần nộp LMS (Week 02, Week 03,...)
 ├── src/
 │   ├── iot_protocol/       # Topic taxonomy, HMAC, User Properties, MQTT 5 helpers
+│   ├── lighting_control/   # DALI, Fade, Thermal Derating, Offline Fallback (Python core)
 │   ├── edge_simulator/     # Virtual Edge Simulator MQTT 5 (đèn/LED/gateway)
 │   ├── backend/            # Mock Cloud Service & Core API
-│   ├── firmware_esp32/     # Firmware gateway/controller ESP32
+│   ├── firmware_esp32/     # Firmware gateway/controller ESP32 + C++ lighting modules
 │   └── frontend/           # Web Console & GIS Dashboard
 ├── tests/                  # Unit test giao thức và cấu hình simulator
 └── tools/                  # Probe MQTT 5, script Jira, tạo repo GitHub
 ```
+
+## 💡 Lighting Control Modules
+- Python core: [`src/lighting_control/README.md`](src/lighting_control/README.md)
+- ESP32 C++ headers: `src/firmware_esp32/include/lighting_control/`
+- ESP32 C++ implementations: `src/firmware_esp32/src/lighting_control/`
+- Unit tests: `tests/test_lighting_control.py`
+- Lưu ý: firmware `main.cpp` cũ vẫn dùng PWM cho đến khi hoàn tất Safety Supervisor, đặc tả đường cong và adapter/transceiver DALI thực tế. Các module mới chưa được coi là nghiệm thu điều khiển DALI trên phần cứng.
 
 ## 🔌 MQTT 5 Protocol & Simulator
 - Đặc tả giao thức: [`docs/specifications/MQTT5_COMMUNICATION_PROTOCOL.md`](docs/specifications/MQTT5_COMMUNICATION_PROTOCOL.md)
