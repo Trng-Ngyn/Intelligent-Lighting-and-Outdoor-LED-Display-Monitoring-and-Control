@@ -1,4 +1,4 @@
-# Lighting Control Modules – Subtask 1
+# Lighting Control Modules
 
 Bộ điều khiển thuần Python dùng cho mô phỏng/tham chiếu và unit test. Firmware ESP32 có các module C++ tương ứng tại `src/firmware_esp32/`.
 
@@ -34,3 +34,13 @@ Từ thư mục gốc repository:
 ```bash
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
+
+## Safety Supervisor
+
+Safety Supervisor là lớp quyết định trung tâm, được mô tả và hướng dẫn riêng tại [`safety/README.md`](safety/README.md). Import nhanh:
+
+```python
+from lighting_control import SafetySupervisor
+```
+
+Các Lighting Control Modules chỉ cung cấp dữ liệu/kết quả; chúng không tự vượt qua hoặc bỏ qua quyết định an toàn của Supervisor.
