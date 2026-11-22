@@ -8,10 +8,22 @@ topic read status/v1/SITE_01/+/+
 topic read alerts/v1/SITE_01/+/+
 topic read commands/v1/SITE_01/+/+/dim/result
 topic write commands/v1/SITE_01/+/+/dim
+
+# The bridge has its own cert. The gw-* identities are lab test principals.
+user bridge-gw-001
 topic write pccom/v1/t1/s01/gw-001/telemetry
 topic write pccom/v1/t1/s01/gw-001/ack
 topic write pccom/v1/t1/s01/gw-001/status
 topic write pccom/v1/t1/s01/gw-001/alerts
+topic read pccom/v1/t1/s01/gw-001/cmd
+topic read pccom/v1/t1/s01/gw-001/receipt
+
+user gw-001
+topic write pccom/v1/t1/s01/gw-001/telemetry
+topic write pccom/v1/t1/s01/gw-001/ack
+topic write pccom/v1/t1/s01/gw-001/status
+topic write pccom/v1/t1/s01/gw-001/alerts
+<<<<<<< HEAD
 topic read pccom/v1/t1/s01/gw-001/cmd
 topic read pccom/v1/t1/s01/gw-001/receipt
 
@@ -41,6 +53,8 @@ topic write pccom/v1/t1/s01/gw-001/telemetry
 topic write pccom/v1/t1/s01/gw-001/ack
 topic write pccom/v1/t1/s01/gw-001/status
 topic write pccom/v1/t1/s01/gw-001/alerts
+=======
+>>>>>>> main
 topic read pccom/v1/t1/s01/gw-001/cmd
 topic read pccom/v1/t1/s01/gw-001/receipt
 

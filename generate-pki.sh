@@ -66,9 +66,11 @@ EXTENSIONS
 make_ca server
 make_ca device
 make_ca service
+make_ca field
 issue server mqtt/mqtt mqtt.dev.pccom.test serverAuth DNS:mqtt.dev.pccom.test
 issue server edge-api/edge-api edge-api.dev.pccom.test serverAuth DNS:edge-api.dev.pccom.test
 issue device test-clients/gw-001 gw-001 clientAuth URI:urn:pccom:dev:t1:s01:gw-001
+issue device test-clients/bridge-gw-001 bridge-gw-001 clientAuth URI:urn:pccom:dev:t1:s01:gw-001
 issue device test-clients/gw-002 gw-002 clientAuth URI:urn:pccom:dev:t1:s02:gw-002
 # Bridge identity riêng cho gateway-level per-device authorization.
 issue device test-clients/bridge-s01 bridge-s01 clientAuth URI:urn:pccom:dev:t1:s01:bridge-s01
@@ -77,17 +79,24 @@ issue device test-clients/unknown gw-unknown clientAuth URI:urn:pccom:dev:t1:s01
 issue device test-clients/revoked gw-revoked clientAuth URI:urn:pccom:dev:t1:s01:gw-revoked
 issue service test-clients/dispatcher dispatcher clientAuth URI:urn:pccom:dev:service:dispatcher
 
+issue field test-clients/bridge-s01 bridge-s01 clientAuth URI:urn:pccom:field:SITE_01:bridge
+issue field test-clients/dev_SITE_01_LGT_NODE_001 dev_SITE_01_LGT_NODE_001 clientAuth URI:urn:pccom:field:SITE_01:light:LGT_NODE_001
+issue field test-clients/dev_SITE_01_DSP_LED_001 dev_SITE_01_DSP_LED_001 clientAuth URI:urn:pccom:field:SITE_01:led_display:DSP_LED_001
+
 openssl ca -config ca/device/ca.cnf -revoke test-clients/revoked.crt
 openssl ca -config ca/device/ca.cnf -gencrl -out mqtt/device-ca.crl
 cp mqtt/device-ca.crl edge-api/
 cp ca/device/ca.crt mqtt/device-ca.crt
 cp ca/device/ca.crt edge-api/device-ca.crt
 cp ca/service/ca.crt mqtt/service-ca.crt
+cp ca/field/ca.crt mqtt/field-ca.crt
 cp ca/server/ca.crt test-clients/server-ca.crt
 for identity in gw-001 gw-002; do
   serial="$(openssl x509 -in "test-clients/$identity.crt" -noout -serial)"
   printf 'SUCCESS:%s %s;\n' "${serial#serial=}" "$identity"
 done > edge-api/enrolled.map
+serial="$(openssl x509 -in test-clients/bridge-gw-001.crt -noout -serial)"
+printf 'SUCCESS:%s gw-001;\n' "${serial#serial=}" >> edge-api/enrolled.map
 
 cd ..
 mv -- "$temporary" "$output"

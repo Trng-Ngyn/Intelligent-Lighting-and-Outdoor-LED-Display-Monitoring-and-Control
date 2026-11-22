@@ -1,6 +1,11 @@
 services:
   mqtt:
-    image: ${LAB_MQTT_IMAGE:-eclipse-mosquitto:2.1.2-alpine}
+    build:
+      context: .
+      dockerfile: lab/Dockerfile.mqtt
+      args:
+        MQTT_IMAGE: ${LAB_MQTT_IMAGE:-eclipse-mosquitto:2.0.22}
+
     user: "${LAB_UID:?Generate lab certificates first}:${LAB_GID:?Generate lab certificates first}"
     entrypoint: ["/usr/sbin/mosquitto"]
     command: ["-c", "/mosquitto/config/mosquitto.conf"]
@@ -10,6 +15,7 @@ services:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - ./acl.devices:/mosquitto/config/acl.devices:ro
       - ./acl.service:/mosquitto/config/acl.service:ro
+      - ./acl.southbound:/mosquitto/config/acl.southbound:ro
       - ./generated/mqtt:/pki:ro
     networks:
       default:
@@ -41,7 +47,7 @@ services:
     security_opt: [no-new-privileges:true]
 
   mqtt-tools:
-    image: ${LAB_MQTT_IMAGE:-eclipse-mosquitto:2.1.2-alpine}
+    image: ${LAB_MQTT_IMAGE:-eclipse-mosquitto:2.0.22}
     user: "${LAB_UID:?Generate lab certificates first}:${LAB_GID:?Generate lab certificates first}"
     entrypoint: []
     profiles: [test]
@@ -50,5 +56,26 @@ services:
     read_only: true
     environment:
       HOME: /tmp
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  alignment-tests:
+    build:
+      context: .
+      dockerfile: lab/Dockerfile.test
+    user: "${LAB_UID:?Generate lab certificates first}:${LAB_GID:?Generate lab certificates first}"
+    profiles: [test]
+    command: ["python", "lab/check_alignment.py", "--host", "mqtt.dev.pccom.test"]
+    environment:
+      PYTHONPATH: /pccom/src
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./src:/pccom/src:ro
+      - ./contracts:/pccom/contracts:ro
+      - ./lab:/pccom/lab:ro
+      - ./generated/test-clients:/clients:ro
+    tmpfs: ["/tmp:mode=1777"]
+    read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]

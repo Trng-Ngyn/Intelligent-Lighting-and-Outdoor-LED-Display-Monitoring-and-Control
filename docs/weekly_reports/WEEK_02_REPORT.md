@@ -15,15 +15,15 @@
 | STT | Họ tên / Tài khoản | Vai trò trong nhóm Scrum | Nhiệm vụ chính trong dự án | Mã Task phụ trách |
 | :---: | :--- | :--- | :--- | :---: |
 | 1 | **Trần Đình Trọng** | **Product Owner (PO) & Team Leader** | **Vai trò cao nhất:** Định nghĩa Product Goal; phân loại và ưu tiên Product Backlog; đại diện làm việc và nghiệm thu với PCCOM CO., LTD; ký nghiệm thu các mốc G0 - G4. | `SCRUM-1`<br/>`SCRUM-12` |
-| 2 | **Thanh Lê** | **Scrum Master (SM)** | Tổ chức các sự kiện Scrum (Daily Scrum 09:00 hàng ngày, Sprint Planning, Review & Retro); xây dựng DoD checklist và theo dõi tiến độ trên Jira. | `SCRUM-7` |
-| 3 | **Nhat Hao Tran** | **Technical Lead & DevOps** | Thiết kế kiến trúc tổng thể phần mềm; cấu hình CI/CD GitHub Actions, áp dụng chuẩn bảo mật OWASP ASVS và phân quyền hệ thống. | `SCRUM-5` |
-| 4 | **Kiệt** | **IoT & Edge Developer 1** | Xây dựng bộ mô phỏng thiết bị ngoại vi (Virtual IoT Edge Simulator), cấu hình định tuyến bản tin MQTT 5 (End-to-End Telemetry Slice). | `SCRUM-6` |
+| 2 | **Lê Hoàng Thanh** | **Scrum Master (SM)** | Tổ chức các sự kiện Scrum (Daily Scrum 09:00 hàng ngày, Sprint Planning, Review & Retro); xây dựng DoD checklist và theo dõi tiến độ trên Jira. | `SCRUM-7` |
+| 3 | **Trần Nhật Hào** | **Technical Lead & DevOps** | Thiết kế kiến trúc tổng thể phần mềm; cấu hình CI/CD GitHub Actions, áp dụng chuẩn bảo mật OWASP ASVS và phân quyền hệ thống. | `SCRUM-5` |
+| 4 | **Bùi Mai Khánh Kiệt** | **IoT & Edge Developer 1** | Xây dựng bộ mô phỏng thiết bị ngoại vi (Virtual IoT Edge Simulator), cấu hình định tuyến bản tin MQTT 5 (End-to-End Telemetry Slice). | `SCRUM-6` |
 | 5 | **Lê Tiến Công** | **Data Engineering Developer** | Thiết kế luồng thu thập dữ liệu đo đạc (telemetry: W, Wh, lux, nhiệt độ); xây dựng Data Schema chuẩn Annex C và cơ chế xác thực dữ liệu. | `SCRUM-8` |
-| 6 | **Tấn Vượng** | **IoT & Edge Developer 2** | Lập trình logic điều khiển Driver ảo, thuật toán Dimming an toàn, cơ chế Fallback cục bộ khi mất mạng và bảo vệ quá nhiệt phần mềm. | `SCRUM-3` |
-| 7 | **Trần Nguyên Vỹ**| **Backend Developer** | Xây dựng Core API service, dịch vụ quản lý trạng thái thiết bị, phân quyền RBAC/MFA, quy trình phê duyệt phát hành nội dung LED đa tầng (DSP 02-04). | `SCRUM-4` |
-| 8 | **Minh Phi** | **ML Developer** | Phân loại taxonomy sự cố thiết bị (F01 - F04), nghiên cứu mô hình phát hiện bất thường thiết bị/hệ thống mạng (AI 02, chuẩn AT 06). | `SCRUM-9` |
+| 6 | **Nguyễn Tấn Vượng** | **IoT & Edge Developer 2** | Lập trình logic điều khiển Driver ảo, thuật toán Dimming an toàn, cơ chế Fallback cục bộ khi mất mạng và bảo vệ quá nhiệt phần mềm. | `SCRUM-3` |
+| 7 | **Trần Hoài Nguyên Vỹ**| **Backend Developer** | Xây dựng Core API service, dịch vụ quản lý trạng thái thiết bị, phân quyền RBAC/MFA, quy trình phê duyệt phát hành nội dung LED đa tầng (DSP 02-04). | `SCRUM-4` |
+| 8 | **Đặng Nguyễn Minh Phi** | **ML Developer** | Phân loại taxonomy sự cố thiết bị (F01 - F04), nghiên cứu mô hình phát hiện bất thường thiết bị/hệ thống mạng (AI 02, chuẩn AT 06). | `SCRUM-9` |
 | 9 | **Bắc Công** | **Frontend Developer** | Phát triển Giao diện điều hành trung tâm (Web Operations Console), bản đồ số GIS Leaflet hiển thị trực quan 50 điểm đèn và 2 màn hình LED. | `SCRUM-10` |
-| 10 | **Phuoc Nguyen** | **QA Engineering Developer** | Xây dựng kịch bản kiểm thử tự động cho các tiêu chí nghiệm thu Gate G0 (AT 01 - AT 05); quản lý ma trận truy vết yêu cầu (RTM). | `SCRUM-11` |
+| 10 | **Nguyễn Đại Phước** | **QA Engineering Developer** | Xây dựng kịch bản kiểm thử tự động cho các tiêu chí nghiệm thu Gate G0 (AT 01 - AT 05); quản lý ma trận truy vết yêu cầu (RTM). | `SCRUM-11` |
 
 ---
 
@@ -39,7 +39,7 @@ Nhóm đã hoàn thành xuất sắc toàn bộ các hạng mục công việc v
 | Mã Task Jira | Thành viên | Vai trò | Tóm tắt công việc đã thực hiện | Ngày commit / log | Giờ đã log | Trạng thái Jira |
 | :---: | :--- | :---: | :--- | :---: | :---: | :---: |
 | **SCRUM-1** | Trần Đình Trọng | PO | Khảo sát 2 site, 50 điểm đèn, 2 màn hình LED; xác định phạm vi 4 Package và khởi tạo Backlog. | 28/10/2026 | 8h | **Done** |
-| **SCRUM-7** | Thanh Lê | SM | Thiết lập quy chuẩn DoD checklist, kế hoạch họp Scrum và điều phối công việc Sprint 1. | 28/10/2026 | 4h | **Done** |
+| **SCRUM-7** | Lê Hoàng Thanh | SM | Thiết lập quy chuẩn DoD checklist, kế hoạch họp Scrum và điều phối công việc Sprint 1. | 28/10/2026 | 4h | **Done** |
 | **SCRUM-5** | Nhat Hao Tran | TL | Khởi tạo CI/CD pipeline GitHub Actions, chuẩn bảo mật OWASP ASVS mức 2 và cấu hình Jira. | 30/10/2026 | 8h | **Done** |
 | **SCRUM-6** | Kiệt | IoT | Xây dựng Virtual IoT Edge Simulator, kiểm tra luồng phát telemetry mẫu 1 KiB/phút qua MQTT 5. | 31/10/2026 | 8h | **Done** |
 | **SCRUM-8** | Lê Tiến Công | DE | Hoàn thành Data Schema (W, Wh, V, A, lux, °C) theo Annex C và kiểm tra JSON Schema validation. | 05/11/2026 | 7h | **Done** |
