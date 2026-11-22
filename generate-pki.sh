@@ -72,6 +72,9 @@ issue server edge-api/edge-api edge-api.dev.pccom.test serverAuth DNS:edge-api.d
 issue device test-clients/gw-001 gw-001 clientAuth URI:urn:pccom:dev:t1:s01:gw-001
 issue device test-clients/bridge-gw-001 bridge-gw-001 clientAuth URI:urn:pccom:dev:t1:s01:gw-001
 issue device test-clients/gw-002 gw-002 clientAuth URI:urn:pccom:dev:t1:s02:gw-002
+# Bridge identity riêng cho gateway-level per-device authorization.
+issue device test-clients/bridge-s01 bridge-s01 clientAuth URI:urn:pccom:dev:t1:s01:bridge-s01
+issue device test-clients/bridge-s02 bridge-s02 clientAuth URI:urn:pccom:dev:t1:s02:bridge-s02
 issue device test-clients/unknown gw-unknown clientAuth URI:urn:pccom:dev:t1:s01:gw-unknown
 issue device test-clients/revoked gw-revoked clientAuth URI:urn:pccom:dev:t1:s01:gw-revoked
 issue service test-clients/dispatcher dispatcher clientAuth URI:urn:pccom:dev:service:dispatcher

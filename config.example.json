@@ -10,6 +10,19 @@
   "security": {
     "signing_secret": "dev-only-change-me-please-32chars"
   },
+  "northbound": {
+    "tenant_id": "t1",
+    "client_id_prefix": "pcvbridge",
+    "retain_status": false,
+    "sites": {
+      "SITE_01": "s01",
+      "SITE_02": "s02"
+    },
+    "gateways": {
+      "SITE_01": "gw-001",
+      "SITE_02": "gw-002"
+    }
+  },
   "simulator": {
     "telemetry_interval_sec": 15,
     "keep_alive_sec": 15,

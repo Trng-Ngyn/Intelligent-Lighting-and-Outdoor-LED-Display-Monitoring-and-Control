@@ -20,7 +20,8 @@
 | LWT | Crash không DISCONNECT, broker phát Will `offline` retained |
 | Chất lượng mã | flake8 và compileall |
 
-Ngoài phạm vi: kiểm thử tải 52 thiết bị, TLS, ACL Mosquitto local, xác thực broker thật.
+Phase 1 chưa bao phủ kiểm thử tải 52 thiết bị và xác thực broker thật. Phase 2 (mục IX) bổ sung
+Mosquitto local, northbound bridge, reject branches, multi-gateway và ACL/TLS lab.
 
 ---
 
@@ -203,7 +204,7 @@ Cloud/probe nhận được trạng thái offline ngay, không phụ thuộc LWT
 1. **Broker công cộng:** `broker.emqx.io` không phù hợp production; số đo có thể dao động.
    Cần kiểm thử lại với Mosquitto local/TLS và ACL trước khi nghiệm thu.
 2. **Docker daemon chưa chạy:** chưa kiểm thử broker local trong môi trường hiện tại. Cần chạy
-   `docker compose up -d` và lặp lại kịch bản E2E/LWT.
+   `docker compose -f docker-compose.dev.yml up -d` và lặp lại kịch bản E2E/LWT.
 3. **Firmware ESP32:** PubSubClient hiện dùng MQTT 3.1.1, chưa gửi được User Properties MQTT 5.
    Cần gateway/bridge hoặc nâng cấp thư viện trước khi tích hợp phần cứng thật.
 4. **Đồng hồ thiết bị:** replay window ±30 giây yêu cầu đồng bộ NTP. Thiết bị lệch giờ sẽ bị
@@ -236,4 +237,131 @@ Giao thức MQTT 5 v1 đã được triển khai và kiểm chứng thực tế:
 - LWT phát hiện offline trong khoảng 0,43 giây, đạt ngân sách 30 giây.
 - Unit test, flake8 và compile đều pass.
 
-Đề nghị chuyển sang bước kiểm thử với Mosquitto local + TLS/ACL và tích hợp firmware MQTT 5.
+Phase 2 tại mục IX đã kiểm thử Mosquitto local + TLS/ACL. Bước tiếp theo là tích hợp firmware
+MQTT 5.
+
+---
+
+## IX. PHASE 2 — LOCAL MOSQUITTO, NORTHBOUND, ACL/TLS
+
+> **Ngày kiểm thử:** 16/11/2026
+> **Broker local:** `eclipse-mosquitto:2.0`, `docker-compose.dev.yml`
+> **Lab:** `eclipse-mosquitto:2.0` listener `8883`/`8884`, cert `gw-001`, `bridge-s01` và `dispatcher`
+> **Kết quả tổng hợp:** PASS; SEC 01 chốt gateway-level per-device authorization
+
+### 1. Unit test và chất lượng mã
+
+```text
+Ran 47 tests in 0.044s
+OK
+```
+
+`flake8` cho `src/edge_simulator/config.py`, `src/edge_simulator/mqtt_client.py`,
+`src/edge_gateway_bridge/bridge.py`, `tests/test_simulator_config.py`,
+`tests/test_mqtt_client.py` và CI selector `E9,F63,F7,F82` đều pass.
+
+### 2. Local southbound
+
+Kịch bản với Mosquitto Docker pass: telemetry, status, command/result và LWT crash.
+Cloud xác thực chữ ký, nhận result cùng `correlation_id`; LWT phát `offline` sau crash.
+
+### 3. Local northbound
+
+Core API `--northbound` → bridge → simulator → `ack`; Cloud nhận telemetry/status.
+Bridge crash phát gateway `offline`; Cloud đánh dấu thiết bị con `unknown`.
+
+### 4. Reject branches và multi-gateway
+
+- Expired command, action không hỗ trợ, thiếu `requested_value`, unknown target đều bị bridge
+  từ chối trước khi fan-out.
+- Cloud log `ACK_RX status=rejected` hoặc `ACK_RX_UNKNOWN`; bridge log `ACK_REJECT`.
+- `gw-001` crash (`--crash-after 7`) → gateway offline; `gw-002` vẫn gửi telemetry độc lập,
+  sau đó graceful offline. Không có flood offline thiết bị con.
+
+### 5. Lab ACL/TLS
+
+`bash smoke.sh` pass với `LAB_MQTT_IMAGE=eclipse-mosquitto:2.0`:
+
+```text
+API: authorized cert; unknown serial, missing/revoked cert, wrong CA and hostname checked.
+Client bridge-s01 received PUBACK (Mid: 1, RC:16)
+Warning: Publish 1 failed: Not authorized.
+Client bridge-s01 received PUBACK (Mid: 1, RC:135)
+MQTT 5: valid publish, command service, bridge ACL, cross-site denial and rejected CA/CRL checked.
+```
+
+Các điểm phát hiện:
+
+- Image lab mặc định `eclipse-mosquitto:2.1.2-alpine` bị `Exited (139)` sau khi load config
+  trong môi trường Windows/WSL Docker; phải override `LAB_MQTT_IMAGE=eclipse-mosquitto:2.0`.
+- Cổng `8884` nằm trong excluded port range của Windows; khi publish ra host phải dùng cổng khác
+  (ví dụ `18884`) hoặc chạy client trong Docker network.
+- Cert lab dùng CN `mqtt.dev.pccom.test`, không khớp `127.0.0.1`; client test cần
+  `broker.tls_insecure=true` hoặc thêm hosts entry.
+- `RC:16` là PUBACK không có subscriber nhưng được phép; `RC:135` là Not authorized, đúng cho
+  cross-site/denied.
+- `bridge-s01` được phép ghi `commands/v1/SITE_01/.../dim` và
+  `pccom/v1/t1/s01/gw-001/status`, nhưng bị chặn khi ghi telemetry thiết bị hoặc topic của site
+  khác. Đây là kiểm chứng cho SEC 01 gateway-level authorization.
+
+### 6. SEC 01 — Bridge identity riêng và full mTLS E2E
+
+SEC 01 được xử lý theo hướng **gateway-level per-device authorization**:
+
+- Bridge dùng identity riêng `bridge-s01`/`bridge-s02` (cert riêng do `generate-pki.sh` cấp),
+  không dùng credential của `gw-001`.
+- ACL cho bridge đọc wildcard telemetry/status/alerts/result trong site, ghi command và
+  northbound `pccom/v1/...` của gateway tương ứng.
+- Thiết bị vẫn chỉ đọc command và ghi telemetry/status/alert/result của chính nó.
+- Bridge tiếp tục xác thực HMAC từng thiết bị. Broker không cô lập tuyệt đối từng thiết bị sau
+  gateway; đây là residual risk đã chấp nhận, không phải broker-level per-device ACL.
+
+Full E2E qua mTLS với Cloud cert `dispatcher`, bridge cert `bridge-s01`, fake device cert
+`gw-001` (ACL tạm chỉ trong lab):
+
+```text
+device: PUBLISH telemetry topic=telemetry/v1/SITE_01/light/LGT_LAB_001 ok=True
+bridge: TELEMETRY_FORWARD device=LGT_LAB_001
+cloud:  TELEMETRY_RX gateway=gw-001 device=LGT_LAB_001
+cloud:  COMMAND_TX gateway=gw-001 device=LGT_LAB_001 value=42
+bridge: COMMAND_RX command_id=... device=LGT_LAB_001
+bridge: ACK_TX command_id=... status=executed observed=42
+```
+
+`Mqtt5Client` xử lý PUBACK/SUBACK reason code `>= 0x80` là thất bại nên ACL deny không còn bị
+coi là publish thành công. Paho `ReasonCode` không `int()` trực tiếp; code dùng helper
+`_reason_value` đọc `.value`. Command được đẩy sang worker thread trước khi publish chờ PUBACK,
+tránh deadlock vì callback `on_message` chạy trên luồng mạng của paho.
+
+```text
+Ran 47 tests in 0.044s
+OK
+```
+
+**Giới hạn còn lại:** broker vẫn không cô lập từng thiết bị con; retained status/stale offline,
+spool 24h, idempotency/receipt và load test chưa hoàn thiện.
+
+### 7. Log Phase 2
+
+| File | Nội dung |
+| :--- | :--- |
+| [`logs/phase2_local_south_cloud.err.log`](logs/phase2_local_south_cloud.err.log) | Local southbound Cloud |
+| [`logs/phase2_local_south_sim.err.log`](logs/phase2_local_south_sim.err.log) | Local southbound simulator |
+| [`logs/phase2_local_north_cloud.err.log`](logs/phase2_local_north_cloud.err.log) | Local northbound Cloud |
+| [`logs/phase2_local_north_bridge.err.log`](logs/phase2_local_north_bridge.err.log) | Local northbound bridge |
+| [`logs/phase2_local_north_sim.err.log`](logs/phase2_local_north_sim.err.log) | Local northbound simulator |
+| [`logs/phase2_local_reject_cloud.err.log`](logs/phase2_local_reject_cloud.err.log) | Cloud log reject branches |
+| [`logs/phase2_local_reject_bridge.err.log`](logs/phase2_local_reject_bridge.err.log) | Bridge log reject branches |
+| [`logs/phase2_multi_cloud.err.log`](logs/phase2_multi_cloud.err.log) | Multi-gateway Cloud |
+| [`logs/phase2_multi_bridgeA.err.log`](logs/phase2_multi_bridgeA.err.log) | `gw-001` crash |
+| [`logs/phase2_multi_bridgeB.err.log`](logs/phase2_multi_bridgeB.err.log) | `gw-002` độc lập |
+| [`logs/phase2_lab_cloud.err.log`](logs/phase2_lab_cloud.err.log) | Cloud qua mTLS |
+| [`logs/phase2_lab_bridge.err.log`](logs/phase2_lab_bridge.err.log) | Bridge qua mTLS + LWT |
+| [`logs/phase2_lab_smoke.log`](logs/phase2_lab_smoke.log) | Smoke ACL/TLS |
+
+### 8. Kết luận Phase 2
+
+Runtime Phương án C đã pass local southbound, local northbound, reject branches,
+multi-gateway LWT, lab ACL/TLS và full mTLS E2E với bridge identity riêng.
+SEC 01 đã chốt theo gateway-level per-device authorization. Việc còn mở trước nghiệm thu đầy đủ
+là canonical contract, retained status/stale offline policy, spool/idempotency và load test.

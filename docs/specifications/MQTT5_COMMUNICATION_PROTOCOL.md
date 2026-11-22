@@ -407,14 +407,16 @@ Khuyến nghị Cloud:
 
 Repo cung cấp:
 
-- `docker-compose.yml`: Mosquitto 2.x, cổng `1883`, cấu hình `deploy/mosquitto/mosquitto.conf`.
+- `docker-compose.dev.yml`: Mosquitto 2.x, cổng `1883` (không TLS) + WebSocket `9001`, cấu hình `deploy/mosquitto/mosquitto.conf`.
 - `deploy/mosquitto/mosquitto.secure.conf.example`: mẫu TLS 8883 + xác thực.
 - `deploy/mosquitto/aclfile.example`: mẫu ACL theo site/type/device.
+- Client simulator/bridge/cloud hỗ trợ mTLS qua `broker.ca_cert`, `broker.client_cert`,
+  `broker.client_key`; `broker.tls_insecure` chỉ dùng lab khi cert CN khác host kết nối.
 
 Chạy local:
 
 ```bash
-docker compose up -d
+docker compose -f docker-compose.dev.yml up -d
 ```
 
 Nếu dùng broker công cộng, có thể đặt `broker.emqx.io:1883` trong `config.json` cho test
@@ -454,6 +456,78 @@ topic write commands/v1/+/+/+/dim
 ACL thực tế phải giới hạn theo site được phân quyền, không dùng wildcard toàn hệ thống cho
 mọi tài khoản.
 
+### 3. Northbound Phương án C
+
+Gateway bridge giữ nguyên southbound cho thiết bị và thêm lớp northbound:
+
+```text
+pccom/v1/{tenant}/{site}/{gateway_id}/{category}
+category = telemetry | cmd | ack | status | alerts | receipt
+```
+
+- Gateway publish `telemetry/ack/status/alerts`, subscribe `cmd`.
+- Cloud/dispatcher subscribe `pccom/v1/{tenant}/+/+/{category}` trong phạm vi được cấp,
+  publish `cmd` đúng gateway.
+- Khóa northbound là khóa HMAC cấp gateway, không dùng khóa thiết bị.
+- Gateway offline do LWT cấp gateway; Cloud đánh dấu thiết bị con `unknown`.
+- Broker lab đã bật `retain_available true`; `northbound.retain_status` vẫn giữ `false`
+  theo policy hiện tại (xem mục 4).
+
+ACL northbound mẫu nằm tại `acl.devices` (gateway/bridge) và `acl.service` (dispatcher).
+
+**SEC 01 — gateway-level per-device authorization.** Bridge là identity riêng
+(`bridge-s01`, `bridge-s02`), không dùng credential của thiết bị/gateway:
+
+```text
+user bridge-s01
+topic read  telemetry/v1/SITE_01/+/+
+topic read  status/v1/SITE_01/+/+
+topic read  alerts/v1/SITE_01/+/+
+topic read  commands/v1/SITE_01/+/+/dim/result
+topic write commands/v1/SITE_01/+/+/dim
+topic write pccom/v1/t1/s01/gw-001/telemetry
+topic write pccom/v1/t1/s01/gw-001/ack
+topic write pccom/v1/t1/s01/gw-001/status
+topic write pccom/v1/t1/s01/gw-001/alerts
+topic read  pccom/v1/t1/s01/gw-001/cmd
+topic read  pccom/v1/t1/s01/gw-001/receipt
+```
+
+Thiết bị vẫn chỉ đọc command và ghi telemetry/status/alert/result của chính nó. Bridge xác thực
+HMAC từng thiết bị trước khi forward. Broker không cô lập tuyệt đối từng thiết bị sau gateway;
+nếu bên mua yêu cầu broker-level per-device ACL thì phải chuyển sang phương án A/B.
+
+### 4. Quy ước topic thống nhất
+
+Hai thiết kế đang tồn tại được thống nhất thành **hai lớp**, không đổi cấu trúc topic đã triển
+khai (xem `docs/proposals/TOPIC_ALIGNMENT.md`):
+
+| Lớp | Phạm vi | Cấu trúc topic | Vai trò |
+| :--- | :--- | :--- | :--- |
+| **Southbound** | Thiết bị ↔ gateway | `{category}/v1/{site_id}/{device_type}/{device_id}` | `category` = `telemetry`, `commands`, `status`, `alerts`; giữ nguyên SCRUM-16, mỗi đèn là một MQTT client có LWT riêng |
+| **Northbound** | Gateway ↔ Cloud | `pccom/v1/{tenant}/{site}/{gateway_id}/{category}` | `category` = `telemetry`, `cmd`, `ack`, `status`, `alerts`, `receipt`; tenant/site/gateway nằm trong topic để ACL tách quyền |
+
+`src/edge_gateway_bridge/bridge.py` là **lớp chuyển đổi** duy nhất: nhận southbound, xác thực HMAC
+từng thiết bị, map sang envelope canonical rồi ký bằng khóa gateway ở northbound; chiều lệnh đi
+ngược lại (nhận `cmd`, fan-out xuống `commands/v1/.../dim`). Vì vậy `src/iot_protocol/topics.py`
+và simulator giữ nguyên, còn ACL broker phải cấp cả hai lớp (`acl.devices`, `acl.service`).
+
+**Bảng ánh xạ cũ → mới**
+
+| Nguồn | Topic cũ | Topic chuẩn | Ghi chú |
+| :--- | :--- | :--- | :--- |
+| Hào (Tech Lead) | `pccom/v1/{tenant}/{site}/{gateway_id}/{category}` | Giữ nguyên làm **northbound** | Không đổi; dùng cho gateway ↔ Cloud |
+| Kiệt (IoT) | `{category}/v1/{site_id}/{device_type}/{device_id}` | Giữ nguyên làm **southbound** | Không đổi; đúng đặc tả SCRUM-16 |
+| Firmware ESP32 (legacy) | `pccom/lighting/{SITE_ID}/{ASSET_ID}/telemetry` | `telemetry/v1/{site_id}/{device_type}/{device_id}` | `SITE_ID` → `site_id`, `ASSET_ID` → `device_id`; cần **migrate ở Phase 5** |
+| Firmware ESP32 (legacy) | `pccom/lighting/{SITE_ID}/{ASSET_ID}/heartbeat` | `status/v1/{site_id}/{device_type}/{device_id}` | Gộp vào status/LWT |
+| Firmware ESP32 (legacy) | `pccom/lighting/{SITE_ID}/{ASSET_ID}/command` | `commands/v1/{site_id}/{device_type}/{device_id}/dim` | Lệnh có hậu tố `/dim` |
+| Firmware ESP32 (legacy) | `pccom/lighting/{SITE_ID}/{ASSET_ID}/result` | `commands/v1/{site_id}/{device_type}/{device_id}/dim/result` | Dùng chung `correlation_id` với lệnh |
+
+> **Retain trên broker lab:** `mosquitto.conf` đã bật `retain_available true` để bản tin
+> `status/v1/...` retained và Will `offline` của LWT hoạt động đúng đặc tả. Chỉ status được retain;
+> telemetry/command/result/alert luôn `retain=false`. Northbound giữ `northbound.retain_status=false`
+> (non-retained) trừ khi chốt policy retained riêng.
+
 ---
 
 ## XI. TƯƠNG THÍCH VÀ TRIỂN KHAI
@@ -461,9 +535,11 @@ mọi tài khoản.
 | Thành phần | Trạng thái |
 | :--- | :--- |
 | `src/iot_protocol/` (topics, signing, headers, mqtt5) | Đã triển khai, có unit test |
+| `src/iot_protocol/northbound_*` | Đã triển khai topic + canonical envelope northbound |
 | `src/edge_simulator/` | Đã triển khai MQTT 5, đa thiết bị, LWT, crash mode |
-| `src/backend/mock_cloud_service.py` | Đã triển khai xác thực envelope và gửi lệnh có ký |
-| `src/backend/core_api.py` | Đã publish lệnh MQTT 5 có ký theo từng thiết bị |
+| `src/edge_gateway_bridge/` | Đã triển khai bridge southbound ↔ northbound, LWT gateway |
+| `src/backend/mock_cloud_service.py` | Đã triển khai xác thực envelope; `--northbound` cho Phương án C |
+| `src/backend/core_api.py` | Đã publish lệnh MQTT 5; `--northbound` gửi qua gateway |
 | `tools/mqtt5_probe.py` | Watch/send-dim/clear-status |
 | Firmware ESP32 hiện tại | MQTT 3.1.1 (PubSubClient) — cần gateway/bridge hoặc nâng cấp thư viện để dùng MQTT 5 |
 
@@ -480,9 +556,17 @@ Khi chuyển firmware sang MQTT 5, cần bổ sung:
 
 | Hạng mục | Kết quả |
 | :--- | :--- |
-| Unit test protocol/config | 25 test pass |
+| Unit test protocol/config/northbound | 47 test pass |
 | E2E telemetry + command + result | Pass, `correlation_id` khớp |
 | LWT crash test | Pass, offline nhận sau khoảng 0,38 giây |
+| E2E northbound qua bridge | Pass: command/ack/telemetry/status, LWT gateway → device con `unknown` |
+| Local Mosquitto southbound + northbound | Pass: telemetry/status/command/result/ack/LWT |
+| Reject branches | Pass: expired, action sai, thiếu `requested_value`, unknown target |
+| Multi-gateway LWT | Pass: `gw-001` offline không ảnh hưởng `gw-002` |
+| Lab ACL/TLS smoke | Pass với `eclipse-mosquitto:2.0`; image `2.1.2-alpine` lỗi `Exited (139)` trên môi trường test |
+| Bridge ACL | Pass: `bridge-s01` ghi command/northbound, bị chặn telemetry/cross-site |
+| Full mTLS E2E | Pass: `bridge-s01` → thiết bị → bridge → Cloud `dispatcher`; ack `executed`, `observed=42` |
+| Reason code MQTT 5 | Pass: PUBACK/SUBACK `>= 0x80` bị coi là thất bại; có regression test |
 | Flake8/compile | Pass |
 
 Chi tiết log và số đo xem `docs/test_reports/MQTT5_E2E_REPORT.md`.
@@ -501,12 +585,20 @@ Chi tiết log và số đo xem `docs/test_reports/MQTT5_E2E_REPORT.md`.
 5. **Message Expiry 60s chỉ cho lệnh dim:** lệnh điều khiển không có ý nghĩa sau 60 giây.
 6. **Taxonomy có version `v1`:** cho phép thay đổi cấu trúc trong tương lai mà không phá
    client cũ.
+7. **Northbound Phương án C:** gateway bridge là anti-corruption layer; southbound giữ
+   nguyên, northbound dùng `pccom/v1/...` với khóa cấp gateway.
+8. **SEC 01 — gateway-level per-device authorization:** bridge có identity riêng, đọc
+   wildcard trong site và xác thực HMAC từng thiết bị; không dùng credential gateway cho
+   bridge và không hứa broker-level per-device isolation.
 
 ---
 
 ## XIV. TÀI LIỆU THAM CHIẾU
 
 - `src/iot_protocol/topics.py` — taxonomy và kiểm tra segment.
+- `src/iot_protocol/northbound_topics.py` — taxonomy northbound `pccom/v1/...`.
+- `src/iot_protocol/northbound_payload.py` — canonical envelope và khóa gateway.
+- `src/edge_gateway_bridge/bridge.py` — bridge southbound ↔ northbound.
 - `src/iot_protocol/signing.py` — canonical string, HMAC, dẫn xuất khóa, ReplayGuard.
 - `src/iot_protocol/headers.py` — User Properties, xác thực envelope, mã alert.
 - `src/iot_protocol/mqtt5.py` — MQTT 5 Properties cho PUBLISH/WILL/CONNECT.

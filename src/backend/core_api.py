@@ -15,6 +15,7 @@ Xem docs/specifications/MQTT5_COMMUNICATION_PROTOCOL.md.
 
 from __future__ import annotations
 
+import argparse
 import http.server
 import json
 import logging
@@ -23,7 +24,7 @@ import socketserver
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 SRC_ROOT = Path(__file__).resolve().parents[1]
 if str(SRC_ROOT) not in sys.path:
@@ -38,7 +39,16 @@ from iot_protocol.mqtt5 import (
     make_connect_properties,
     make_publish_properties,
 )
-from iot_protocol.signing import derive_device_key, new_correlation_id
+from iot_protocol.northbound_payload import (
+    build_envelope,
+    derive_gateway_key,
+    encode_envelope,
+)
+from iot_protocol.northbound_topics import northbound_topic
+from iot_protocol.signing import (
+    derive_device_key,
+    new_correlation_id,
+)
 from iot_protocol.topics import command_dim_topic, command_result_topic
 
 HTTP_PORT = 8080
@@ -49,6 +59,7 @@ LOGGER = logging.getLogger(LOGGER_NAME)
 MQTT_CLIENT: Optional[Mqtt5Client] = None
 RUNTIME_CONFIG: Optional[SimulatorConfig] = None
 DEVICE_INDEX: dict[tuple[str, str, str], DeviceSpec] = {}
+NORTHBOUND_MODE = False
 
 # Kho luu tru trang thai thiet bi trong RAM (In-memory Asset Cache)
 ASSET_STATE = {}
@@ -113,19 +124,44 @@ def configure_logging(level: str = "INFO") -> None:
     )
 
 
-def init_mqtt() -> None:
+def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+    """Đọc tham số dòng lệnh của Core API."""
+    parser = argparse.ArgumentParser(
+        description="Core API giả lập cho Web Console và MQTT 5",
+    )
+    parser.add_argument("--config", help="Đường dẫn config JSON")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--northbound",
+        action="store_true",
+        help="Gửi lệnh qua pccom/v1 (cần gateway bridge)",
+    )
+    mode.add_argument(
+        "--southbound",
+        action="store_true",
+        help="Gửi trực tiếp topic thiết bị IoT (mặc định)",
+    )
+    return parser.parse_args(argv)
+
+
+def init_mqtt(
+    northbound: bool = False,
+    config_path: Optional[str] = None,
+) -> None:
     """Nạp config, tạo client MQTT 5 và kết nối broker.
 
     Nếu broker/config lỗi, HTTP API vẫn chạy nhưng lệnh dim sẽ không được gửi;
     lỗi được log ở mức ERROR để người vận hành biết.
     """
-    global MQTT_CLIENT, RUNTIME_CONFIG, DEVICE_INDEX
+    global MQTT_CLIENT, RUNTIME_CONFIG, DEVICE_INDEX, NORTHBOUND_MODE
 
     try:
-        config = load_config()
+        config = load_config(config_path)
     except ConfigError as exc:
         LOGGER.error("Không nạp được cấu hình MQTT: %s", exc)
         return
+
+    NORTHBOUND_MODE = northbound
 
     RUNTIME_CONFIG = config
     DEVICE_INDEX = config.device_index()
@@ -145,9 +181,10 @@ def init_mqtt() -> None:
 
     MQTT_CLIENT = client
     LOGGER.info(
-        "Core API đã kết nối MQTT 5 broker=%s:%s",
+        "Core API đã kết nối MQTT 5 broker=%s:%s mode=%s",
         config.broker.host,
         config.broker.port,
+        "northbound" if northbound else "southbound",
     )
 
 
@@ -188,6 +225,9 @@ def send_dim_command(asset_id: str, brightness: int) -> Optional[str]:
             asset_id,
         )
         return None
+
+    if NORTHBOUND_MODE:
+        return _send_dim_northbound(spec, brightness)
 
     topic = command_dim_topic(spec.site_id, spec.device_type, spec.device_id)
     result_topic = command_result_topic(
@@ -244,6 +284,92 @@ def send_dim_command(asset_id: str, brightness: int) -> Optional[str]:
         cid,
         ts_ms,
         result_topic,
+        ok,
+    )
+    return cid if ok else None
+
+
+def _send_dim_northbound(
+    spec: DeviceSpec,
+    brightness: int,
+) -> Optional[str]:
+    """Gửi một lệnh dim qua gateway northbound."""
+    if MQTT_CLIENT is None or RUNTIME_CONFIG is None:
+        return None
+
+    config = RUNTIME_CONFIG
+    gateway = config.gateway_for_site(spec.site_id)
+    site_slug = config.northbound_site(spec.site_id)
+    tenant = config.northbound.tenant_id
+    topic = northbound_topic(tenant, site_slug, gateway, "cmd")
+    ack_topic = northbound_topic(tenant, site_slug, gateway, "ack")
+    cid = new_correlation_id()
+    now = int(time.time())
+    expires_at = now + COMMAND_MESSAGE_EXPIRY_SEC
+    body = {
+        "action": "DIM",
+        "requested_value": brightness,
+        "actor": "WebConsole_Operator",
+        "issued_at": now,
+        "expires_at": expires_at,
+        "priority": 1,
+    }
+    envelope = build_envelope(
+        tenant_id=tenant,
+        site_id=site_slug,
+        gateway_id=gateway,
+        source_site_id=spec.site_id,
+        device_type=spec.device_type,
+        device_id=spec.device_id,
+        category="cmd",
+        data=body,
+        extra={
+            "command_id": cid,
+            "action": "DIM",
+            "requested_value": brightness,
+            "issued_at": now,
+            "expires_at": expires_at,
+            "priority": 1,
+        },
+    )
+    payload = encode_envelope(envelope)
+    secret = derive_gateway_key(
+        config.security.signing_secret,
+        tenant,
+        site_slug,
+        gateway,
+    )
+    headers, _, ts_ms = build_headers(
+        secret,
+        topic,
+        payload,
+        correlation_id=cid,
+    )
+    props = make_publish_properties(
+        headers,
+        content_type=CONTENT_TYPE_JSON,
+        message_expiry_interval=COMMAND_MESSAGE_EXPIRY_SEC,
+        correlation_data=cid.encode("utf-8"),
+        response_topic=ack_topic,
+    )
+    ok = MQTT_CLIENT.publish(
+        topic,
+        payload,
+        qos=1,
+        retain=False,
+        properties=props,
+    )
+    LOGGER.info(
+        "COMMAND_TX_NB asset_id=%s gateway=%s brightness=%s topic=%s "
+        "command_id=%s correlation_id=%s ts_ms=%s response_topic=%s ok=%s",
+        spec.device_id,
+        gateway,
+        brightness,
+        topic,
+        cid,
+        cid,
+        ts_ms,
+        ack_topic,
         ok,
     )
     return cid if ok else None
@@ -380,14 +506,17 @@ class CoreApiHandler(http.server.SimpleHTTPRequestHandler):
         )
 
 
-def main() -> int:
+def main(argv: Optional[Sequence[str]] = None) -> int:
     """Khởi động Core API và MQTT client."""
+    args = parse_args(argv)
     configure_logging()
-    init_mqtt()
+    northbound = bool(args.northbound and not args.southbound)
+    init_mqtt(northbound=northbound, config_path=args.config)
     LOGGER.info(
-        "Core API chạy tại http://localhost:%s (MQTT connected=%s)",
+        "Core API chạy tại http://localhost:%s (MQTT connected=%s mode=%s)",
         HTTP_PORT,
         MQTT_CLIENT is not None,
+        "northbound" if northbound else "southbound",
     )
     with socketserver.TCPServer(("", HTTP_PORT), CoreApiHandler) as httpd:
         try:

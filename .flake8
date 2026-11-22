@@ -11,5 +11,6 @@ per-file-ignores =
     src/edge_simulator/virtual_lighting_network.py: E402
     src/backend/mock_cloud_service.py: E402
     src/backend/core_api.py: E402
+    src/edge_gateway_bridge/bridge.py: E402
     tools/mqtt5_probe.py: E402
     tests/test_*.py: E402

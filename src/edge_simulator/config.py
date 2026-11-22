@@ -20,7 +20,8 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
@@ -49,6 +50,10 @@ class BrokerConfig:
     username: Optional[str] = None
     password: Optional[str] = None
     use_tls: bool = False
+    ca_cert: Optional[str] = None
+    client_cert: Optional[str] = None
+    client_key: Optional[str] = None
+    tls_insecure: bool = False
     client_id_prefix: str = "pcvsim"
 
 
@@ -86,6 +91,63 @@ class SecurityConfig:
     signing_secret: str
 
 
+_SITE_NUMBER = re.compile(r"(\d+)$")
+
+
+def _derive_site_slug(source_site: str) -> str:
+    """Suy ra site slug northbound từ site id southbound.
+
+    Ví dụ SITE_01 -> s01, SITE_TEST_01 -> s01. Đây chỉ là quy ước dev/test;
+    production nên khai báo tường minh trong northbound.sites.
+    """
+    match = _SITE_NUMBER.search(source_site)
+    if match:
+        return f"s{int(match.group(1)):02d}"
+    return source_site.lower()
+
+
+def _derive_gateway_id(source_site: str) -> str:
+    """Suy ra gateway id northbound từ site id southbound.
+
+    Ví dụ SITE_01 -> gw-001, SITE_TEST_01 -> gw-001. Production nên khai báo
+    tường minh trong northbound.gateways.
+    """
+    match = _SITE_NUMBER.search(source_site)
+    if match:
+        return f"gw-{int(match.group(1)):03d}"
+    return f"gw-{source_site.lower()}"
+
+
+@dataclass(frozen=True)
+class NorthboundConfig:
+    """Ánh xạ southbound site/device sang namespace northbound Phương án C."""
+
+    tenant_id: str = "t1"
+    site_by_source: tuple[tuple[str, str], ...] = ()
+    gateway_by_source: tuple[tuple[str, str], ...] = ()
+    client_id_prefix: str = "pcvbridge"
+    retain_status: bool = False
+
+    def site_slug(self, source_site: str) -> str:
+        """Trả về site slug northbound cho một site southbound."""
+        mapped = dict(self.site_by_source).get(source_site)
+        value = mapped or _derive_site_slug(source_site)
+        return validate_segment(value, "northbound.site_id")
+
+    def gateway_id(self, source_site: str) -> str:
+        """Trả về gateway id northbound cho một site southbound."""
+        mapped = dict(self.gateway_by_source).get(source_site)
+        value = mapped or _derive_gateway_id(source_site)
+        return validate_segment(value, "northbound.gateway_id")
+
+    def source_site(self, site_slug: str) -> Optional[str]:
+        """Tra ngược site southbound từ site slug nếu có khai báo tường minh."""
+        for source, mapped in self.site_by_source:
+            if mapped == site_slug:
+                return source
+        return None
+
+
 @dataclass(frozen=True)
 class SimulatorConfig:
     """Toàn bộ cấu hình đã kiểm tra và mở rộng danh sách thiết bị."""
@@ -95,10 +157,19 @@ class SimulatorConfig:
     security: SecurityConfig
     devices: tuple[DeviceSpec, ...]
     source_path: Path
+    northbound: NorthboundConfig = field(default_factory=NorthboundConfig)
 
     def device_index(self) -> dict[tuple[str, str, str], DeviceSpec]:
         """Trả về index tra cứu thiết bị theo (site, type, id)."""
         return {device.key: device for device in self.devices}
+
+    def northbound_site(self, source_site: str) -> str:
+        """Trả về site slug northbound cho một site southbound."""
+        return self.northbound.site_slug(source_site)
+
+    def gateway_for_site(self, source_site: str) -> str:
+        """Trả về gateway id northbound cho một site southbound."""
+        return self.northbound.gateway_id(source_site)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -167,6 +238,16 @@ def _require_str(value: Any, name: str) -> str:
     return value.strip()
 
 
+def _optional_str(value: Any, name: str) -> Optional[str]:
+    """Đọc chuỗi tùy chọn; None/rỗng trả về None, còn lại phải là chuỗi."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ConfigError(f"{name} phải là chuỗi")
+    stripped = value.strip()
+    return stripped or None
+
+
 def _require_int(value: Any, name: str, minimum: int = 0) -> int:
     """Bắt buộc một trường phải là int >= minimum."""
     if isinstance(value, bool) or not isinstance(value, int):
@@ -174,6 +255,27 @@ def _require_int(value: Any, name: str, minimum: int = 0) -> int:
     if value < minimum:
         raise ConfigError(f"{name} phải >= {minimum}")
     return value
+
+
+def _parse_string_map(
+    value: Any,
+    name: str,
+    target_name: str,
+) -> tuple[tuple[str, str], ...]:
+    """Đọc mapping source -> target và kiểm tra segment topic."""
+    raw = _require_mapping(value, name)
+    result: list[tuple[str, str]] = []
+    for source, target in raw.items():
+        source_id = validate_segment(
+            _require_str(source, f"{name} key"),
+            "source_site_id",
+        )
+        target_id = validate_segment(
+            _require_str(target, f"{name}.{source}"),
+            target_name,
+        )
+        result.append((source_id, target_id))
+    return tuple(result)
 
 
 def _resolve_config_path(explicit_path: Optional[str]) -> Path:
@@ -364,12 +466,48 @@ def load_config(explicit_path: Optional[str] = None) -> SimulatorConfig:
     if use_tls is None:
         use_tls = bool(broker_raw.get("use_tls", False))
 
+    ca_cert = _env_str("SIM_BROKER_CA_CERT")
+    if ca_cert is None:
+        ca_cert = _optional_str(
+            broker_raw.get("ca_cert"),
+            "broker.ca_cert",
+        )
+    client_cert = _env_str("SIM_BROKER_CLIENT_CERT")
+    if client_cert is None:
+        client_cert = _optional_str(
+            broker_raw.get("client_cert"),
+            "broker.client_cert",
+        )
+    client_key = _env_str("SIM_BROKER_CLIENT_KEY")
+    if client_key is None:
+        client_key = _optional_str(
+            broker_raw.get("client_key"),
+            "broker.client_key",
+        )
+    if (ca_cert or client_cert or client_key) and not use_tls:
+        raise ConfigError(
+            "broker.ca_cert/client_cert/client_key yêu cầu use_tls=true"
+        )
+    if bool(client_cert) != bool(client_key):
+        raise ConfigError(
+            "broker.client_cert và broker.client_key phải đi cùng nhau"
+        )
+    tls_insecure = _env_bool("SIM_BROKER_TLS_INSECURE")
+    if tls_insecure is None:
+        tls_insecure = bool(broker_raw.get("tls_insecure", False))
+    if tls_insecure and not use_tls:
+        raise ConfigError("broker.tls_insecure yêu cầu use_tls=true")
+
     broker = BrokerConfig(
         host=host,
         port=port,
         username=username,
         password=password,
         use_tls=use_tls,
+        ca_cert=ca_cert,
+        client_cert=client_cert,
+        client_key=client_key,
+        tls_insecure=tls_insecure,
         client_id_prefix=_require_str(
             broker_raw.get("client_id_prefix", "pcvsim"),
             "broker.client_id_prefix",
@@ -390,6 +528,13 @@ def load_config(explicit_path: Optional[str] = None) -> SimulatorConfig:
             settings_raw.get("keep_alive_sec", 15),
             "simulator.keep_alive_sec",
             minimum=1,
+        )
+    # Broker coi client mất kết nối sau khoảng 1,5 x Keep Alive. Giới hạn 20s
+    # để bảo đảm phát hiện offline trong ngân sách 30s của đặc tả.
+    if keep_alive > 20:
+        raise ConfigError(
+            "simulator.keep_alive_sec phải <= 20 "
+            "(1.5 x keep_alive <= 30s ngân sách phát hiện offline)"
         )
 
     replay_window = _env_int("SIM_REPLAY_WINDOW_MS")
@@ -441,6 +586,34 @@ def load_config(explicit_path: Optional[str] = None) -> SimulatorConfig:
             "(khóa chỉ dùng cho dev/test, không commit khóa thật)"
         )
 
+    northbound_raw = _require_mapping(data.get("northbound", {}), "northbound")
+    tenant_id = validate_segment(
+        _env_str("SIM_TENANT_ID")
+        or _require_str(
+            northbound_raw.get("tenant_id", "t1"),
+            "northbound.tenant_id",
+        ),
+        "tenant_id",
+    )
+    northbound = NorthboundConfig(
+        tenant_id=tenant_id,
+        site_by_source=_parse_string_map(
+            northbound_raw.get("sites", {}),
+            "northbound.sites",
+            "site_id",
+        ),
+        gateway_by_source=_parse_string_map(
+            northbound_raw.get("gateways", {}),
+            "northbound.gateways",
+            "gateway_id",
+        ),
+        client_id_prefix=_require_str(
+            northbound_raw.get("client_id_prefix", "pcvbridge"),
+            "northbound.client_id_prefix",
+        ),
+        retain_status=bool(northbound_raw.get("retain_status", False)),
+    )
+
     raw_groups = data.get("devices")
     if not isinstance(raw_groups, list) or not raw_groups:
         raise ConfigError("devices phải là mảng không rỗng")
@@ -460,4 +633,5 @@ def load_config(explicit_path: Optional[str] = None) -> SimulatorConfig:
         security=SecurityConfig(signing_secret=signing_secret),
         devices=devices,
         source_path=path,
+        northbound=northbound,
     )

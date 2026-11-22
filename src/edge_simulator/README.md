@@ -46,6 +46,13 @@ Cấu trúc:
   "security": {
     "signing_secret": "dev-only-change-me-please-32chars"
   },
+  "northbound": {
+    "tenant_id": "t1",
+    "client_id_prefix": "pcvbridge",
+    "retain_status": false,
+    "sites": {"SITE_01": "s01"},
+    "gateways": {"SITE_01": "gw-001"}
+  },
   "simulator": {
     "telemetry_interval_sec": 15,
     "keep_alive_sec": 15,
@@ -79,6 +86,10 @@ Cấu trúc:
 | Trường | Ý nghĩa |
 | :--- | :--- |
 | `security.signing_secret` | Master secret để dẫn xuất khóa HMAC từng thiết bị; tối thiểu 16 ký tự |
+| `broker.use_tls` | Bật TLS; cần cho listener 8883/8884 của lab |
+| `broker.ca_cert` | CA dùng xác thực broker (mTLS lab) |
+| `broker.client_cert` + `broker.client_key` | Chứng chỉ/khóa client cho mTLS; phải đi cùng nhau |
+| `broker.tls_insecure` | Bỏ kiểm tra hostname; chỉ dùng lab khi cert CN khác `127.0.0.1` |
 | `telemetry_interval_sec` | Chu kỳ publish telemetry |
 | `keep_alive_sec` | Keep Alive MQTT; mặc định 15 giây |
 | `replay_window_ms` | Cửa sổ chống replay; mặc định 30000 ms |
@@ -86,6 +97,10 @@ Cấu trúc:
 | `max_devices` | Giới hạn số thiết bị sau khi mở rộng |
 | `devices[].device_id_prefix` + `count` | Sinh ID hàng loạt, ví dụ `LGT_NODE_001` … `LGT_NODE_050` |
 | `devices[].device_ids` | Danh sách ID cố định |
+| `northbound.tenant_id` | Tenant northbound; mặc định `t1` |
+| `northbound.sites` | Map source site → northbound site slug, ví dụ `SITE_01` → `s01` |
+| `northbound.gateways` | Map source site → gateway id, ví dụ `SITE_01` → `gw-001` |
+| `northbound.retain_status` | Cho phép retained status northbound; giữ `false` với broker `retain_available false` |
 
 `device_type` chỉ nhận `light`, `led_display`, `gateway`. `site_id`/`device_id` chỉ dùng
 `[A-Za-z0-9_-]`, tối đa 64 ký tự.
@@ -159,6 +174,29 @@ Chỉ theo dõi status để đo LWT:
 Mock Cloud subscribe telemetry/status/alert/result, xác thực chữ ký, log trạng thái và gửi lệnh
 dim có ký.
 
+### Chạy kiến trúc C: bridge + northbound
+
+```powershell
+# Terminal 1: Cloud northbound
+.\.venv\Scripts\python.exe src\backend\mock_cloud_service.py `
+  --config tests\fixtures\simulator.test.json --northbound --no-auto-command
+
+# Terminal 2: gateway bridge
+.\.venv\Scripts\python.exe src\edge_gateway_bridge\bridge.py `
+  --config tests\fixtures\simulator.test.json
+
+# Terminal 3: simulator southbound
+.\.venv\Scripts\python.exe src\edge_simulator\virtual_lighting_network.py `
+  --config tests\fixtures\simulator.test.json --max-devices 3
+
+# Terminal 4: Core API northbound
+.\.venv\Scripts\python.exe src\backend\core_api.py --northbound
+```
+
+Bridge map telemetry/status/alerts/result southbound sang `pccom/v1/{tenant}/{site}/{gateway}/...`,
+nhận `cmd` northbound và fan-out xuống `commands/v1/.../dim`. Kiểm thử LWT gateway bằng
+`--crash-after 8`; Cloud sẽ log `GATEWAY_STATUS ... offline` và đánh dấu thiết bị con `unknown`.
+
 ### Dọn retained status
 
 ```powershell
@@ -179,15 +217,25 @@ Báo cáo E2E/LWT: [`docs/test_reports/MQTT5_E2E_REPORT.md`](../../docs/test_rep
 
 ---
 
-## 6. Broker local bằng Docker
+## 6. Chạy broker
+
+Broker simulator nhanh (không TLS) dùng `docker-compose.dev.yml`:
 
 ```powershell
-docker compose up -d
+docker compose -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml logs -f mosquitto
+docker compose -f docker-compose.dev.yml down
 ```
 
-Sau đó đổi `broker.host` thành `localhost` trong `config.json` (hoặc đặt
-`$env:SIM_BROKER_HOST = "localhost"`). Cấu hình Mosquitto nằm trong
+Cấu hình mở MQTT `1883` (không TLS) và WebSocket `9001`; file Mosquitto nằm trong
 [`deploy/mosquitto/`](../../deploy/mosquitto/).
+
+`compose.yml` là lab bảo mật mTLS của Tech Lead (MQTT `8883`), chạy riêng bằng
+`docker compose -f compose.yml up -d` và cần chứng chỉ/lab env theo README gốc.
+Hai cấu hình độc lập, mỗi cái dùng lệnh `-f` riêng.
+
+Sau đó đổi `broker.host` thành `localhost` trong `config.json` (hoặc đặt
+`$env:SIM_BROKER_HOST = "localhost"`).
 
 Với production, dùng TLS 8883, xác thực theo thiết bị và ACL theo site/type/device; xem
 `deploy/mosquitto/mosquitto.secure.conf.example` và `deploy/mosquitto/aclfile.example`.
@@ -204,6 +252,10 @@ Với production, dùng TLS 8883, xác thực theo thiết bị và ACL theo sit
 | Lệnh sai chữ ký/replay/hết hạn | Từ chối, publish result/alert tương ứng |
 | Dừng graceful | Publish `status offline` retained rồi DISCONNECT |
 | Crash/mất điện | Không DISCONNECT; broker phát LWT `offline` retained |
+| Bridge nhận telemetry | Map sang `pccom/v1/.../telemetry`, ký bằng khóa gateway |
+| Bridge nhận `cmd` | Xác thực khóa gateway, fan-out `commands/v1/.../dim`, ký bằng khóa thiết bị |
+| Bridge nhận result | Publish `pccom/v1/.../ack` cùng `command_id`/`correlation_id` |
+| Bridge crash | Broker phát LWT gateway; Cloud log `GATEWAY_STATUS offline`, device con `unknown` |
 
 ---
 
@@ -211,7 +263,7 @@ Với production, dùng TLS 8883, xác thực theo thiết bị và ACL theo sit
 
 | Hiện tượng | Nguyên nhân thường gặp | Cách xử lý |
 | :--- | :--- | :--- |
-| `Không kết nối được broker` | Sai host/port, firewall, broker chưa chạy | Kiểm tra `broker.emqx.io:1883`, chạy `docker compose up -d` |
+| `Không kết nối được broker` | Sai host/port, firewall, broker chưa chạy | Kiểm tra `broker.emqx.io:1883`, chạy `docker compose -f docker-compose.dev.yml up -d` |
 | `SEC_SIGNATURE_INVALID` | Simulator và Cloud dùng master secret khác nhau | Dùng cùng `config.json` hoặc cùng `SIM_SIGNING_SECRET` |
 | `SEC_REPLAY_DETECTED` | Đồng hồ lệch quá 30 giây hoặc gửi lại cùng `correlation_id` | Đồng bộ NTP, không tái sử dụng ID |
 | Không thấy offline | Dùng `--run-seconds` (graceful) thay vì `--crash-after` | Dùng `--crash-after` và probe `watch --status-only` |

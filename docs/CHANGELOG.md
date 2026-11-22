@@ -1,5 +1,50 @@
 # CHANGELOG
 
+## [1.1.0] - 2026-11-16
+
+### Added
+
+- Quyết định Phương án C và traceability RFP tại `docs/proposals/TOPIC_ALIGNMENT.md`.
+- Northbound contract `src/iot_protocol/northbound_topics.py` và canonical envelope
+  `src/iot_protocol/northbound_payload.py`.
+- Gateway bridge `src/edge_gateway_bridge/bridge.py`:
+  - Map telemetry/status/alerts/result southbound sang `pccom/v1/...`.
+  - Nhận `cmd` northbound, xác thực khóa gateway, fan-out và ký southbound.
+  - Mỗi gateway một MQTT client/LWT; `--crash-after` để kiểm thử LWT.
+- Mock Cloud `--northbound`, Core API `--northbound`; gateway offline đánh dấu
+  thiết bị con `unknown` thay vì flood offline.
+- Cấu hình `northbound` (`tenant_id`, `sites`, `gateways`, `retain_status`).
+- Hỗ trợ mTLS cho simulator/bridge/cloud: `broker.ca_cert`, `broker.client_cert`,
+  `broker.client_key`; `broker.tls_insecure` chỉ dành cho lab.
+- SEC 01 theo gateway-level per-device authorization:
+  - Bridge có identity riêng `bridge-s01`/`bridge-s02`; `generate-pki.sh` cấp cert riêng.
+  - `acl.devices` cấp bridge đọc wildcard southbound trong site, ghi command và northbound,
+    không dùng credential gateway cho bridge.
+  - `deploy/mosquitto/aclfile.example` bổ sung mẫu bridge identity.
+- `Mqtt5Client` xử lý PUBACK/SUBACK reason code `>= 0x80` là thất bại; helper
+  `_reason_value` chuẩn hóa paho `ReasonCode` (không `int()` trực tiếp).
+- Bridge xử lý command trên worker thread để publish chờ PUBACK không deadlock luồng mạng paho.
+
+### Changed
+
+- ACL gateway/dispatcher bổ sung `status`/`alerts`; `smoke.sh` kiểm tra bridge ACL.
+- `Mqtt5Client.set_will` nhận `retain` để tương thích broker
+  `retain_available false`.
+
+### Tests
+
+- 47 unit test pass, gồm regression reason code dùng `paho.mqtt.ReasonCode` thật.
+- E2E northbound command/ack/telemetry/status và LWT gateway đã kiểm chứng với
+  `broker.emqx.io`.
+- E2E local Mosquitto: southbound đầy đủ, northbound command/ack/telemetry/status/LWT,
+  reject branches và multi-gateway LWT độc lập.
+- Lab ACL/TLS smoke pass với `LAB_MQTT_IMAGE=eclipse-mosquitto:2.0`; image mặc định
+  `eclipse-mosquitto:2.1.2-alpine` bị `Exited (139)` trên môi trường Windows/WSL Docker.
+- Full mTLS E2E: bridge `bridge-s01` → thiết bị → bridge → Cloud `dispatcher`;
+  telemetry/status/command/ack pass, `status=executed`, `observed=42`.
+- Bridge LWT gateway offline qua mTLS pass. Broker-level per-device isolation vẫn là
+  residual risk đã chấp nhận.
+
 ## [1.0.0] - 2026-11-14
 
 ### Added
@@ -24,7 +69,7 @@
   - `watch` (kèm `--status-only`), `send-dim`, `clear-status`.
 - Hạ tầng và cấu hình:
   - `config.example.json` (50 đèn + 2 LED), `tests/fixtures/simulator.test.json`.
-  - `docker-compose.yml`, `deploy/mosquitto/mosquitto.conf`.
+  - `docker-compose.dev.yml`, `deploy/mosquitto/mosquitto.conf`.
   - Mẫu TLS/ACL: `mosquitto.secure.conf.example`, `aclfile.example`.
   - `requirements.txt`, `requirements-dev.txt`, `.env.example`, `.flake8`.
 - Kiểm thử:
@@ -40,6 +85,7 @@
 - Core API gửi lệnh theo từng thiết bị với khóa dẫn xuất riêng thay vì một khóa dùng chung.
 - `Mqtt5Client.publish` hỗ trợ `wait_for_ack` để telemetry/status không chặn luồng mạng.
 - Log được cấu hình UTF-8 trên Windows.
+- Đổi tên `docker-compose.yml` thành `docker-compose.dev.yml` cho broker simulator và cập nhật lệnh `docker compose -f` trong tài liệu.
 
 ### Fixed
 

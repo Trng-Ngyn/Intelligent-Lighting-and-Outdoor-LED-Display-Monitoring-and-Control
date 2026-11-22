@@ -72,6 +72,18 @@ for bad_identity in revoked dispatcher; do
     exit 1
   fi
 done
-printf '%s\n' 'MQTT 5: valid publish, command service, cross-site denial and rejected CA/CRL checked.'
+bridge_cmd=commands/v1/SITE_01/light/LGT_NODE_001/dim
+bridge_status=pccom/v1/t1/s01/gw-001/status
+for bridge_topic in "$bridge_cmd" "$bridge_status"; do
+  bridge_result="$(mqtt_pub bridge-s01 8883 "$bridge_topic" 2>&1)"
+  printf '%s\n' "$bridge_result" | grep -Ei 'PUBACK.*RC:[[:space:]]*(0|16)([^0-9]|$)'
+done
+for forbidden_topic in \
+  telemetry/v1/SITE_01/light/LGT_NODE_001 \
+  pccom/v1/t1/s02/gw-002/telemetry; do
+  denied="$(mqtt_pub bridge-s01 8883 "$forbidden_topic" 2>&1 || true)"
+  printf '%s\n' "$denied" | grep -Ei 'PUBACK.*RC:[[:space:]]*135([^0-9]|$)|Warning: Publish .*not authorized'
+done
+printf '%s\n' 'MQTT 5: valid publish, command service, bridge ACL, cross-site denial and rejected CA/CRL checked.'
 
 "${compose[@]}" run --rm --no-deps --build -T alignment-tests
