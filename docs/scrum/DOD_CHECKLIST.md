@@ -1,5 +1,5 @@
 # Scrum Definition of Done (DoD) & Cadence
-**Chịu trách nhiệm:** Thanh Lê (`thanhlh05`) - Scrum Master  
+**Chịu trách nhiệm:** Lê Hoàng Thanh (`thanhlh05`) - Scrum Master  
 **Áp dụng:** Dự án Intelligent Lighting and Outdoor LED Display Monitoring and Control (Sprint 1 - 8)
 
 ---
