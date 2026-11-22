@@ -54,3 +54,32 @@
 - **Gửi Telemetry (ESP32 -> Cloud):** `pccom/lighting/SITE_01/LGT_NODE_001/telemetry`
 - **Nhận Lệnh (Cloud -> ESP32):** `pccom/lighting/SITE_01/LGT_NODE_001/command`
 - **Báo cáo Kết quả (ESP32 -> Cloud):** `pccom/lighting/SITE_01/LGT_NODE_001/result`
+
+
+## Lighting Control Modules
+
+Các module C++ mới được đặt tại:
+- `include/lighting_control/dali_controller.h` và `src/lighting_control/dali_controller.cpp`
+- `include/lighting_control/fade_controller.h` và `src/lighting_control/fade_controller.cpp`
+- `include/lighting_control/thermal_engine.h` và `src/lighting_control/thermal_engine.cpp`
+- `include/lighting_control/offline_fallback_manager.h` và `src/lighting_control/offline_fallback_manager.cpp`
+
+Các module độc lập, được gọi từ lớp tích hợp sau khi Safety Supervisor và bộ điều phối main được nối vào luồng điều khiển. `IDaliBus` và `IArcPowerMapper` là các interface; cần adapter/transceiver DALI thực tế và bộ chuyển đổi arc-power được đặc tả ở Subtask 3. Không có DALI transceiver/pinout trong repository hiện tại nên chưa có adapter phần cứng thật.
+
+**Quan trọng:** `main.cpp` hiện tại vẫn chứa đường điều khiển PWM cũ. Không xem PWM là DALI và không dùng trạng thái `COMMAND_SENT`/`UNVERIFIED` làm bằng chứng đầu ra quang học. Việc nối module mới vào luồng firmware chính sẽ thực hiện sau Safety Supervisor và cấu hình phần cứng DALI đã xác nhận.
+
+
+## Safety Supervisor
+
+Safety Supervisor C++ được triển khai tại:
+- `include/lighting_control/safety_decision.h`
+- `include/lighting_control/fault_manager.h`
+- `include/lighting_control/safety_supervisor.h`
+- `src/lighting_control/fault_manager.cpp`
+- `src/lighting_control/safety_supervisor.cpp`
+
+Supervisor là lớp ra quyết định duy nhất cho `final_brightness_pct`; nó không tự gửi lệnh DALI. Lỗi phần cứng nghiêm trọng và thermal shutdown yêu cầu OFF 0%; lỗi cảm biến nhiệt độ áp dụng mức 30% như giới hạn mặc định, nhưng lịch/command OFF vẫn được phép tắt đèn. Lỗi bus DALI được đánh dấu `physical_output=UNKNOWN` và không phát lệnh mới vì không thể bảo đảm truyền được lệnh OFF qua bus đang lỗi.
+
+Unit test Python chạy từ root repository bằng `python -m unittest discover -s tests -p "test_*.py" -v`. C++ host harness và lệnh biên dịch được mô tả trong `tests/cpp/test_safety_supervisor.cpp` và `src/lighting_control/safety/README.md`. Host harness không thay thế PlatformIO build hoặc kiểm thử phần cứng.
+
+**Trạng thái tích hợp:** Safety Supervisor hiện là module độc lập; chưa thay thế luồng PWM cũ trong `src/main.cpp`. Không tuyên bố đây là DALI thực tế cho tới khi có adapter/transceiver và cấu hình phần cứng tương ứng.

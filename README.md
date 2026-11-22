@@ -47,13 +47,23 @@ An integrated IoT and cloud platform designed to monitor and manage outdoor smar
 │   └── weekly_reports/     # Báo cáo tiến độ hàng tuần nộp LMS (Week 02, Week 03,...)
 ├── src/
 │   ├── iot_protocol/       # Topic taxonomy, HMAC, User Properties, MQTT 5 helpers
+│   ├── lighting_control/   # DALI, Fade, Thermal Derating, Offline Fallback (Python core)
 │   ├── edge_simulator/     # Virtual Edge Simulator MQTT 5 (đèn/LED/gateway)
 │   ├── backend/            # Mock Cloud Service & Core API
-│   ├── firmware_esp32/     # Firmware gateway/controller ESP32
+│   ├── firmware_esp32/     # Firmware gateway/controller ESP32 + C++ lighting modules
 │   └── frontend/           # Web Console & GIS Dashboard
 ├── tests/                  # Unit test giao thức và cấu hình simulator
 └── tools/                  # Probe MQTT 5, script Jira, tạo repo GitHub
 ```
+
+## 💡 Lighting Control Modules and Safety Supervisor
+- Python core: [`src/lighting_control/README.md`](src/lighting_control/README.md)
+- ESP32 C++ headers: `src/firmware_esp32/include/lighting_control/`
+- ESP32 C++ implementations: `src/firmware_esp32/src/lighting_control/`
+- Unit tests `Lighting Control Modules`: `tests/test_lighting_control.py`
+- **Safety Supervisor:** `src/lighting_control/safety/` (Python) và `src/firmware_esp32/{include,src}/lighting_control/` (C++). Tài liệu: [`src/lighting_control/safety/README.md`](src/lighting_control/safety/README.md).
+- Unit tests `Safety Supervisor` : `tests/test_safety_supervisor.py`; C++ host harness: `tests/cpp/test_safety_supervisor.cpp`.
+- Lưu ý: Safety Supervisor đã được triển khai và kiểm thử độc lập, nhưng chưa được nối vào `main.cpp`. Firmware `main.cpp` vẫn là luồng PWM cũ cho đến khi hoàn tất tích hợp, đặc tả đường cong và adapter/transceiver DALI thực tế. Các module mới chưa được coi là nghiệm thu điều khiển DALI trên phần cứng.
 
 ## 🔌 MQTT 5 Protocol & Simulator
 - Đặc tả giao thức: [`docs/specifications/MQTT5_COMMUNICATION_PROTOCOL.md`](docs/specifications/MQTT5_COMMUNICATION_PROTOCOL.md)
@@ -133,13 +143,10 @@ xác thực Registry trên broker, chữ ký lệnh và fallback trên Staging.
 6. Dev chạy sau push vào `develop`. Staging chạy bằng Run workflow với nhánh
    `release/staging` và target `staging`. Kiểm tra API, MQTT, DB read/write và
    audit trong môi trường đích theo kế hoạch QA. Thu lại run ID và task ARN.
-   Để rollback chủ động, đưa ARN trước đó đã duyệt vào file môi trường tương ứng
-   qua nhánh được bảo vệ rồi chạy lại workflow. Đảm bảo schema tương thích.
+   Để rollback chủ động, đưa ARN trước đó đã duyệt vào file môi trường tương ứng qua nhánh được bảo vệ rồi chạy lại workflow. Đảm bảo schema tương thích.
 
-`lab-ci.yml` chạy kiểm thử Compose, độc lập với quyền truy cập Cloud. Trước khi
-dùng trong Staging, cập nhật image/tag thành digest đã rà soát và ghi phiên bản
-OpenSSL, broker, proxy, AWS CLI vào bằng chứng chạy. Gói mẫu chưa mang thông tin
-tài khoản, cấu hình thiết bị thật hoặc quyền triển khai.
+`lab-ci.yml` chạy kiểm thử Compose, độc lập với quyền truy cập Cloud. Trước khi dùng trong Staging, cập nhật image/tag thành digest đã rà soát và ghi phiên bản
+OpenSSL, broker, proxy, AWS CLI vào bằng chứng chạy. Gói mẫu chưa mang thông tin tài khoản, cấu hình thiết bị thật hoặc quyền triển khai.
 
 - [Eclipse Mosquitto](https://mosquitto.org/man/mosquitto-conf-5.html)
 - [NGINX SSL module](https://nginx.org/en/docs/http/ngx_http_ssl_module.html)
