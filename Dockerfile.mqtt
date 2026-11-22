@@ -1,0 +1,8 @@
+ARG MQTT_IMAGE=eclipse-mosquitto:2.0.22
+FROM ${MQTT_IMAGE} AS build
+RUN apk add --no-cache build-base mosquitto-dev
+COPY lab/retain_policy.c /tmp/retain_policy.c
+RUN cc -Wall -Wextra -Werror -fPIC -shared /tmp/retain_policy.c -o /tmp/pccom-retain.so
+
+FROM ${MQTT_IMAGE}
+COPY --from=build /tmp/pccom-retain.so /usr/local/lib/pccom-retain.so
