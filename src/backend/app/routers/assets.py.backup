@@ -1,0 +1,19 @@
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.exc import SQLAlchemyError
+from app.core.security import current_user
+from app.db import fetch_all_assets
+
+router = APIRouter()
+
+@router.get("")
+def list_assets(
+    tenant_id: str | None = Query(default=None),
+    site_id: str | None = Query(default=None),
+    user: dict = Depends(current_user),
+):
+    try:
+        return {"items": fetch_all_assets(tenant_id, site_id)}
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except SQLAlchemyError:
+        raise HTTPException(status_code=503, detail="Không truy vấn được TimescaleDB")

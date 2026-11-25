@@ -31,6 +31,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from edge_simulator.config import ConfigError, DeviceSpec, SimulatorConfig, load_config
+from app.db import insert_telemetry_lighting
 from edge_simulator.mqtt_client import Mqtt5Client, MqttConnectionError
 from iot_protocol.headers import (
     ALERT_HEADER_MISSING,
@@ -743,6 +744,32 @@ class MockCloudService:
             cid,
             ts_ms,
         )
+
+        try:
+            saved = insert_telemetry_lighting(
+                asset_code=str(data.get("asset_id") or ""),
+                data=data,
+                correlation_id=cid,
+                topic=topic,
+                ts_ms=ts_ms,
+            )
+            self.logger.info(
+                "TELEMETRY_DB saved=%s asset=%s seq=%s",
+                saved,
+                data.get("asset_id"),
+                data.get("sequence"),
+            )
+        except ValueError as exc:
+            self.logger.warning(
+                "TELEMETRY_DB b? qua asset=%s: %s",
+                data.get("asset_id"),
+                exc,
+            )
+        except Exception:
+            self.logger.exception(
+                "TELEMETRY_DB l?i asset=%s",
+                data.get("asset_id"),
+            )
 
     def _handle_result(
         self,

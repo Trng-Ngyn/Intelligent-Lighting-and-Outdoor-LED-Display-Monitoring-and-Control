@@ -1,0 +1,69 @@
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Header
+from pydantic import BaseModel, Field
+from sqlalchemy.exc import SQLAlchemyError
+
+from app.core.security import require_roles
+from app.db import fetch_all_assets
+import core_api
+
+router = APIRouter()
+
+
+class LightingDimRequest(BaseModel):
+    asset_id: UUID
+    brightness: int = Field(ge=0, le=100)
+    policy_version: str = Field(default="v1.0", min_length=1, max_length=80)
+
+
+@router.post("/dim", status_code=202)
+def dim_lighting(
+    body: LightingDimRequest,
+    user: dict = Depends(require_roles("OPERATOR")),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+):
+    if core_api.MQTT_CLIENT is None or core_api.RUNTIME_CONFIG is None:
+        raise HTTPException(status_code=503, detail="MQTT ch?a k?t n?i")
+
+    try:
+        assets = fetch_all_assets()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except SQLAlchemyError:
+        raise HTTPException(status_code=503, detail="Kh?ng truy v?n ???c TimescaleDB")
+
+    asset = next(
+        (item for item in assets if str(item.get("asset_id")) == str(body.asset_id)),
+        None,
+    )
+
+    if asset is None:
+        raise HTTPException(status_code=404, detail="Kh?ng t?m th?y asset trong CSDL")
+
+    if asset.get("kind") != "lighting":
+        raise HTTPException(status_code=422, detail="Asset kh?ng ph?i thi?t b? chi?u s?ng")
+
+    asset_code = asset.get("asset_code")
+    if not asset_code:
+        raise HTTPException(status_code=422, detail="Asset ch?a c? asset_code ?? ?nh x? MQTT")
+
+    spec = core_api._find_light_spec(str(asset_code))
+    if spec is None:
+        raise HTTPException(status_code=404, detail="Asset_code ch?a kh?p thi?t b? trong c?u h?nh MQTT")
+
+    try:
+        command_id = core_api.send_dim_command(str(asset_code), body.brightness)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    if command_id is None:
+        raise HTTPException(status_code=503, detail="Kh?ng g?i ???c l?nh MQTT")
+
+    return {
+        "status": "accepted",
+        "command_id": command_id,
+        "asset_id": str(body.asset_id),
+        "asset_code": str(asset_code),
+        "brightness": body.brightness,
+    }

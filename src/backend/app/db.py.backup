@@ -1,0 +1,53 @@
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
+from app.core.config import settings
+
+_engine: Engine | None = None
+
+def get_engine() -> Engine:
+    global _engine
+    if not settings.database_url:
+        raise RuntimeError("Chưa cấu hình DATABASE_URL trong file .env")
+    if _engine is None:
+        _engine = create_engine(settings.database_url, pool_pre_ping=True)
+    return _engine
+
+
+def fetch_all_assets(tenant_id: str | None = None, site_id: str | None = None):
+    query = """
+        SELECT tenant_id, site_id, asset_id, asset_code, device_id, kind, parent_id,
+               location_id, circuit_id, model, firmware, owner_ref,
+               energy_mode, heartbeat_s, commissioned_at, retired_at
+        FROM lighting.assets
+        WHERE retired_at IS NULL
+          AND (CAST(:tenant_id AS uuid) IS NULL OR tenant_id = CAST(:tenant_id AS uuid))
+          AND (CAST(:site_id AS uuid) IS NULL OR site_id = CAST(:site_id AS uuid))
+        ORDER BY commissioned_at DESC NULLS LAST
+    """
+    with get_engine().connect() as conn:
+        rows = conn.execute(
+            text(query),
+            {"tenant_id": tenant_id, "site_id": site_id}
+        )
+        return [dict(row._mapping) for row in rows]
+
+
+def fetch_telemetry_history(asset_id: str, start_time, end_time, limit: int = 500):
+    query = """
+        SELECT asset_id, source_time, received_time, power_w,
+               energy_interval_wh, energy_register_wh, voltage_v,
+               current_a, power_factor, illuminance_lx, temperature_c,
+               metric_quality, details
+        FROM lighting.telemetry_lighting
+        WHERE asset_id = CAST(:asset_id AS uuid)
+          AND source_time >= :start_time
+          AND source_time <= :end_time
+        ORDER BY source_time DESC
+        LIMIT :limit
+    """
+    with get_engine().connect() as conn:
+        rows = conn.execute(text(query), {
+            "asset_id": asset_id, "start_time": start_time,
+            "end_time": end_time, "limit": limit
+        })
+        return [dict(row._mapping) for row in rows]
