@@ -1,0 +1,26 @@
+name: pccom-w5
+
+services:
+  timescaledb:
+    image: timescale/timescaledb:2.32.0-pg17
+    container_name: pccom-w5-tsdb
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Missing POSTGRES_PASSWORD}
+      POSTGRES_DB: pccom_staging
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - w5_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pccom_staging"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+volumes:
+  w5_pgdata:

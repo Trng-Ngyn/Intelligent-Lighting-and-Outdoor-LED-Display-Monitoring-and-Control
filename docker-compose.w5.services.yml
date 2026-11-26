@@ -1,0 +1,50 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0.22
+    container_name: pccom-w5-mqtt
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1883:1883"
+    volumes:
+      - ./deploy/mosquitto/w5/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - w5_mqttdata:/mosquitto/data
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-h", "127.0.0.1", "-t", "w5/health", "-m", "ok", "-q", "1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  ingestion:
+    build:
+      context: .
+      dockerfile: src/ingestion/Dockerfile
+    container_name: pccom-w5-ingestion
+    restart: unless-stopped
+    environment:
+      PGHOST: timescaledb
+      PGPORT: "5432"
+      PGDATABASE: pccom_staging
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Missing POSTGRES_PASSWORD}
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "1883"
+      MQTT_TOPIC: "telemetry/v1/#"
+      MQTT_CLIENT_ID: pccom-w5-ingestion
+      BATCH_SIZE: "500"
+      FLUSH_SECONDS: "0.2"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "healthcheck.py"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+    stop_grace_period: 30s
+
+volumes:
+  w5_mqttdata:
