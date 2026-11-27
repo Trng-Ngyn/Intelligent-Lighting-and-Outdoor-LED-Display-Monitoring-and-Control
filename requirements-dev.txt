@@ -1,2 +1,5 @@
 -r requirements.txt
 flake8>=7,<8
+jsonschema[format-nongpl]>=4.25.1,<5
+referencing>=0.37.0,<1
+tzdata>=2026.6
