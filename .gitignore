@@ -31,3 +31,13 @@ htmlcov/
 *.csr
 *.crl
 *.crt
+
+# ESP-IDF/PlatformIO project sinh artifact và sdkconfig đã resolve.
+/src/firmware_esp32_idf/.pio/
+/src/firmware_esp32_idf/build/
+/src/firmware_esp32_idf/sdkconfig
+/src/firmware_esp32_idf/sdkconfig.dev
+/src/firmware_esp32_idf/sdkconfig.secure
+/src/firmware_esp32_idf/sdkconfig.old
+/src/firmware_esp32_idf/dependencies.lock
+/src/firmware_esp32_idf/managed_components/

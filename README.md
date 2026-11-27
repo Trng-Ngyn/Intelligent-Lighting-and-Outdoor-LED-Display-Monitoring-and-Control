@@ -82,24 +82,28 @@ Copy-Item config.example.json config.json
 
 `
 
-### Chạy Lab Kiểm thử Kiến trúc & An ninh mạng (mTLS & Cloud Smoke Test):
-`ash
+### Chạy Lab Kiểm thử Kiến trúc & An ninh mạng (mTLS & Cloud Smoke Test)
+
 ```bash
-bash lab/generate-pki.sh
-docker compose --env-file lab/compose.env -f lab/compose.yml up -d
-bash lab/smoke.sh
-docker compose --env-file lab/compose.env -f lab/compose.yml down -v
-`
+bash generate-pki.sh
+docker compose --env-file compose.env -f docker-compose.lab.yml up -d --build
+bash smoke.sh
+docker compose --env-file compose.env -f docker-compose.lab.yml down -v
 ```
 
-`generate-pki.sh` tạo CA server, CA gateway và CA dịch vụ cùng các chứng chỉ
-ngắn hạn. Các CA này chỉ dành cho lab. File sinh trong `lab/generated/` chứa
-khóa riêng và được bỏ qua khi commit. Nếu tạo lại, hãy dừng Compose và chuyển
-thư mục `lab/generated/` ra một vị trí kiểm thử mới trước khi chạy lại.
+`generate-pki.sh` tạo CA server, CA gateway, CA dịch vụ và CA field cùng các
+chứng chỉ ngắn hạn. Các CA này chỉ dành cho lab. File sinh trong `generated/`
+chứa khóa riêng và được bỏ qua khi commit. Nếu tạo lại, hãy dừng Compose và
+chuyển thư mục `generated/` ra một vị trí kiểm thử mới trước khi chạy lại.
 
-`lab/smoke.sh` kiểm tra API có serial đã đăng ký và MQTT 5 phân quyền topic.
-Listener MQTT 8883 dành cho thiết bị. Listener 8884 dành cho dịch vụ và chỉ
-truy cập trong mạng Compose. API chỉ có `GET /v1/edge/health` mô phỏng.
+`smoke.sh` kiểm tra API có serial đã đăng ký, MQTT 5 phân quyền topic và
+chính sách retain. Listener 8883 dành cho thiết bị/gateway northbound, 8884
+dành cho dịch vụ (chỉ trong mạng Compose), 8885 dành cho thiết bị southbound
+và được publish ra `127.0.0.1`. Plugin `lab/retain_policy.c` chỉ cho phép
+`retain=true` ở nhánh `status/v1/...` và `pccom/v1/.../status`; mọi topic khác
+bị đổi thành non-retained. `lab/check_alignment.py` kiểm tra topic theo
+`src/iot_protocol/topics.py`, LWT `Will Delay Interval = 0` và trạng thái
+retained bằng paho-mqtt. API chỉ có `GET /v1/edge/health` mô phỏng.
 Các phần kiểm chữ ký lệnh, nhật ký thực thi, chấp thuận theo tenant/site,
 thu hồi phiên đang chạy và adapter phần cứng được đặc tả trong SAD để tích hợp.
 

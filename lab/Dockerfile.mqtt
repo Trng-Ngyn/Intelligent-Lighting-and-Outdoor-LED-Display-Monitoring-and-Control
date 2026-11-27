@@ -1,0 +1,12 @@
+ARG MQTT_IMAGE=eclipse-mosquitto:2.0.22
+FROM ${MQTT_IMAGE}
+
+# Plugin policy retain: chỉ nhánh status được phép giữ retained message.
+USER root
+RUN apk add --no-cache build-base mosquitto-dev
+COPY lab/retain_policy.c /tmp/retain_policy.c
+RUN cc -fPIC -shared -O2 -Wall -Wextra -I/usr/include \
+      -o /usr/local/lib/pccom-retain.so /tmp/retain_policy.c -lmosquitto \
+    && rm -f /tmp/retain_policy.c \
+    && chown mosquitto:mosquitto /usr/local/lib/pccom-retain.so
+USER mosquitto
