@@ -3,6 +3,10 @@ CONFIG_IDF_TARGET="esp32"
 CONFIG_FREERTOS_HZ=1000
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 
+# ESP32-WROOM-32 có 4MB flash; mặc định sdkconfig sinh ra 2MB không đủ cho
+# bảng 2 app slot (app1 kết thúc ở 0x2C0000). Phải khớp board PlatformIO.
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+
 # Phải khớp partitions.csv; PlatformIO chỉ dùng CSV để tạo partitions.bin, còn
 # config firmware mặc định vẫn là single-app nếu không bật CUSTOM ở đây.
 CONFIG_PARTITION_TABLE_CUSTOM=y
@@ -11,7 +15,9 @@ CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 # esp-mqtt: MQTT 5 (User Property/Correlation Data, Will Delay Interval) cần
 # task riêng 8192 bytes; config chạy ở runtime ghi đè sdkconfig nên cũng đặt trong code.
 CONFIG_MQTT_USE_CUSTOM_CONFIG=y
+CONFIG_MQTT_PROTOCOL_5=y
 CONFIG_MQTT_TASK_STACK_SIZE=8192
+CONFIG_MQTT_BUFFER_SIZE=2048
 
 # mTLS: esp-mqtt dùng mbedTLS của IDF 5.4 (có TLS 1.3); không dùng bundle CA host.
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=n

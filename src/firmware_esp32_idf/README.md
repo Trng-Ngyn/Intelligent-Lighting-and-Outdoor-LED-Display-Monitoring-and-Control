@@ -1,8 +1,13 @@
 # Firmware ESP32-WROOM-32 (ESP-IDF)
 
-Project thay thế dần `src/firmware_esp32/` (Arduino). Hiện mới ở mốc **S1:**
-scaffold + kiểm chứng toolchain. Chưa có telemetry/MQTT/HMAC/3 task (S2).
-Bằng chứng build: `docs/test_reports/FIRMWARE_S1_VALIDATION.md`.
+Project thay thế dần `src/firmware_esp32/` (Arduino). Đã sang mốc **S2+S3:**
+telemetry Annex C, HMAC-SHA256, mTLS MQTT 5, đúng 3 task FreeRTOS và hardening
+(watchdog, timeout/retry, chính sách queue). Bằng chứng:
+`docs/test_reports/FIRMWARE_S1_VALIDATION.md`,
+`docs/test_reports/FIRMWARE_S2_VALIDATION.md` và (sau khi build) S3.
+
+**S2/S3 mới chỉ dừng ở mức build/kiểm chứng tĩnh.** Chưa nạp firmware, chưa chạy
+soak 4h trên bo thật, chưa build/flash profile `secure`, không `espefuse burn`.
 
 ## Toolchain
 
@@ -55,3 +60,83 @@ PlatformIO tạo `partitions.bin` trực tiếp từ CSV, nhưng firmware vẫn 
 `CONFIG_PARTITION_TABLE_CUSTOM=y` và
 `CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"` (đã khai báo trong
 `sdkconfig.defaults.common`) để config trong firmware khớp bảng nạp.
+
+## Kiến trúc S2 (3 task ứng dụng)
+
+| Task | Nhịp | Việc làm |
+| :-- | :-- | :-- |
+| `pccom-net` | sự kiện + 1s poll queue | WiFi STA, SNTP, mTLS MQTT 5, giữ LWT, **duy nhất** nơi gọi publish |
+| `pccom-ingest` | theo `q_sample_req` | Dựng payload Annex C, lấy sequence từ NVS, ký HMAC, đẩy vào `q_publish` |
+| `pccom-tele` | `vTaskDelayUntil` 10s | Chỉ gửi yêu cầu lấy mẫu vào `q_sample_req` |
+
+Không có task thứ tư. MQTT client của ESP-IDF tự tạo task nội bộ của nó.
+
+### Hardening S3
+
+- **TWDT:** cấu hình lại từ 5s (mặc định sdkconfig, có giám sát idle task) sang
+  **30s**, `idle_core_mask=0`, `trigger_panic=true`. Cả 3 task được đăng ký và
+  feed ở đầu mỗi vòng lặp; task thoát lỗi sẽ tự hủy đăng ký để không để entry
+  "task đã chết" trong TWDT.
+- **Thời gian/chờ mạng:** Network Manager chờ WiFi+SNTP tối đa **120s**, poll
+  1s. Sau 10s chưa có IP gọi lại `esp_wifi_connect()`; sau 30s chưa sync gọi
+  `esp_sntp_stop()` → `esp_sntp_init()` lại. Quá timeout thì task dừng có kiểm
+  soát (không treo vĩnh viễn). Log thống kê mỗi **60s**.
+- **Provisioning:** đọc UART với timeout 1s/lần và **idle timeout 120s**;
+  hết thời gian trả `-ERR TIMEOUT` rồi `app_main` thử lại sau 3s.
+- **Chính sách queue:**
+  - `q_sample_req` (len 4): đầy thì **bỏ nhịp mới nhất**, không block nhịp 10s.
+  - `q_publish` (len 8): đầy thì **drop-oldest**, giữ bản tin mới nhất.
+  - MQTT chưa nối: bỏ bản tin khi lấy ra, **không đệm offline**.
+  - Bộ đếm `dropped_samples`, `dropped_publishes`, `published`,
+    `publish_failures`, `net_retries` chỉ để log, không đổi logic nghiệp vụ.
+
+Phạm vi bản tin:
+
+- Publish `telemetry/v1/{site}/{type}/{id}`, QoS 1, retain false,
+  Content-Type `application/json`.
+- Publish `status/v1/{site}/{type}/{id}` = `online` lúc CONNECT và
+  `offline` qua LWT, QoS 1, retain true, Will Delay Interval = 0, keepalive 15s.
+- Mọi bản tin có User Properties `correlation_id`, `ts_ms`, `signature`;
+  canonical `v1\n{topic}\n{cid}\n{ts_ms}\n{payload}`; khóa
+  `HMAC-SHA256(master_secret, "{site}/{type}/{id}")`.
+- **Không subscribe** `commands/v1/...`, không publish `dim/result`, không
+  fallback offline. Topic/handler lệnh chỉ đặt chỗ trong `pccom_reserved.*`.
+
+## Provisioning UART1 (lần đầu boot)
+
+Nếu NVS chưa có cấu hình, `app_main` chặn và chờ khung trên UART1
+(RX=GPIO16, TX=GPIO17, 115200 8N1):
+
+```text
+PCCOM:<base64(TLV)>,<crc32hex>\n
+TLV = tag(1 byte) | length(2 byte big-endian) | value
+```
+
+TLV đầu tiên **bắt buộc** là version: `tag=0, length=1, value=0x01`. Khung
+thiếu/sai version bị từ chối (`-ERR BAD_TLV`) trước khi ghi NVS.
+
+CRC32-IEEE (poly `0xEDB88320`) tính trên **bytes TLV sau khi decode**, ghi
+thành 8 chữ số hex. Firmware trả `+READY`, `+ACK` hoặc `-ERR <mã>`; **không
+echo nội dung khung**, không log mật khẩu/PEM/secret.
+
+| Tag | Trường | Bắt buộc |
+| :-- | :-- | :-- |
+| 0 | `version` = 1 (1 byte, phải đứng đầu) | có |
+| 1 | `site_id` | có |
+| 2 | `device_type` (`light`/`led_display`/`gateway`) | có |
+| 3 | `device_id` | có |
+| 4 | `broker_host` | có |
+| 5 | `broker_port` (2 byte big-endian) | có |
+| 6 | CA PEM của broker | có |
+| 7 | client certificate PEM | có |
+| 8 | client private key PEM | có |
+| 9 | HMAC master secret | có |
+| 10 | WiFi SSID | có |
+| 11 | WiFi password | có |
+| 12 | MQTT client id / username (CN cert) | có |
+
+Các giá trị được lưu vào namespace NVS `pccom_cfg`; sequence nằm ở
+`pccom_rt`. Với profile `secure`, NVS được mã hóa và khóa sinh trên chip.
+
+Khi cần thay broker/dev/profile, phải xóa `sdkconfig.dev` / `sdkconfig.secure`
+và build lại env tương ứng như mô tả ở phần trên.
