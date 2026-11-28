@@ -1,0 +1,3 @@
+# Cai them neu can nap autoencoder.keras (TensorFlow co the lam Docker image vuot 500MB)
+-r requirements.txt
+tensorflow-cpu==2.18.0
