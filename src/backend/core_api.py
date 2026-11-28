@@ -268,16 +268,22 @@ def send_dim_command(asset_id: str, brightness: int) -> Optional[str]:
         correlation_data=cid.encode("utf-8"),
         response_topic=result_topic,
     )
+    publish_start = time.perf_counter()
+
     ok = MQTT_CLIENT.publish(
-        topic,
-        payload,
-        qos=1,
-        retain=False,
-        properties=props,
+    topic,
+    payload,
+    qos=1,
+    retain=False,
+    properties=props,
+    wait_for_ack=False,
     )
+
+    publish_latency_ms = (time.perf_counter() - publish_start) * 1000
+
     LOGGER.info(
         "COMMAND_TX asset_id=%s brightness=%s topic=%s correlation_id=%s "
-        "ts_ms=%s response_topic=%s ok=%s",
+        "ts_ms=%s response_topic=%s ok=%s publish_latency_ms=%.3f",
         asset_id,
         brightness,
         topic,
@@ -285,6 +291,7 @@ def send_dim_command(asset_id: str, brightness: int) -> Optional[str]:
         ts_ms,
         result_topic,
         ok,
+        publish_latency_ms,
     )
     return cid if ok else None
 

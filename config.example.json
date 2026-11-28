@@ -5,7 +5,7 @@
     "username": "",
     "password": "",
     "use_tls": false,
-    "client_id_prefix": "pcvsim"
+    "client_id_prefix": "pcvapi2026"
   },
   "security": {
     "signing_secret": "dev-only-change-me-please-32chars"
