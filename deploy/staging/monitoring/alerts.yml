@@ -1,0 +1,17 @@
+groups:
+  - name: staging
+    rules:
+      - alert: CoreApiUnavailable
+        expr: up{job="pccom-api"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations: {summary: "PCCOM Core API unavailable"}
+      - alert: MqttDisconnected
+        expr: pccom_mqtt_connected == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: "Web Gateway lost its mTLS MQTT session"}
+      - alert: DeadLettersIncreasing
+        expr: delta(pccom_dlq_total[5m]) > 0
+        labels: {severity: warning}
+        annotations: {summary: "Inspect telemetry dead letter records"}

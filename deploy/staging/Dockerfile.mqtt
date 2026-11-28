@@ -1,0 +1,8 @@
+FROM eclipse-mosquitto:2.0.22 AS build
+USER root
+RUN apk add --no-cache build-base mosquitto-dev
+COPY deploy/staging/retain_policy.c /tmp/retain_policy.c
+RUN cc -fPIC -shared -O2 -Wall -Wextra -I/usr/include \
+    -o /tmp/pccom-retain.so /tmp/retain_policy.c -lmosquitto
+FROM eclipse-mosquitto:2.0.22
+COPY --from=build /tmp/pccom-retain.so /usr/local/lib/pccom-retain.so

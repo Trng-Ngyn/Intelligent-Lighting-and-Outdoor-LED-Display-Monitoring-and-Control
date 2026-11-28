@@ -1,0 +1,2 @@
+-r requirements-test.txt
+pgserver==0.1.4

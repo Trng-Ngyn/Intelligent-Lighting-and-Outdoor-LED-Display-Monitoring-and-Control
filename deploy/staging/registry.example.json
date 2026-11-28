@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "tenant_id": "REPLACE_WITH_TENANT_UUID",
+      "site_id": "REPLACE_WITH_SITE_UUID",
+      "asset_id": "REPLACE_WITH_ASSET_UUID",
+      "device_id": "REPLACE_WITH_DEVICE_UUID",
+      "location_id": "REPLACE_WITH_LOCATION_UUID",
+      "tenant_code": "t1",
+      "cloud_site": "s01",
+      "gateway_code": "gw-001",
+      "field_site": "SITE_01",
+      "device_code": "LGT_NODE_001",
+      "kind": "lighting",
+      "model": "ESP32-D4i-Zhaga-Controller",
+      "firmware": "1.0.0-pilot",
+      "energy_mode": "counter",
+      "location_name": "REPLACE_WITH_ACTUAL_LOCATION",
+      "latitude": null,
+      "longitude": null,
+      "heartbeat_s": 60,
+      "command_mode": "legacy",
+      "trust_legacy_clock": false,
+      "is_demo": false
+    }
+  ]
+}

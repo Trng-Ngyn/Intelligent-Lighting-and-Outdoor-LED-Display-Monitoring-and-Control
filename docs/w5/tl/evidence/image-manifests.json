@@ -1,0 +1,62 @@
+[
+  {
+    "image": "docker.io/timescale/timescaledb:2.32.0-pg17",
+    "status": 200,
+    "digest": "sha256:6a6b7d7a346d7c6be03a310c240706f3bbc6d7adbdf3fbc07823570b34337f5e"
+  },
+  {
+    "image": "docker.io/library/eclipse-mosquitto:2.0.22",
+    "status": 200,
+    "digest": "sha256:81a6193ae693942a3231cd3ac52875b02b7e3a19da671b2fb4b55cc874c5b279"
+  },
+  {
+    "image": "docker.io/prom/prometheus:v3.5.0",
+    "status": 200,
+    "digest": "sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996"
+  },
+  {
+    "image": "docker.io/grafana/grafana:12.0.2",
+    "status": 200,
+    "digest": "sha256:b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa"
+  },
+  {
+    "image": "docker.io/grafana/loki:3.7.0",
+    "status": 200,
+    "digest": "sha256:c316b7c7589a5eeca843b6926c7446149d18300b79ac8538dc4ae063bc478da2"
+  },
+  {
+    "image": "docker.io/grafana/alloy:v1.22.0",
+    "status": 200,
+    "digest": "sha256:9acc2529bc1edb7f5b2bd801dd8334ebc80c158e3a9e5526ecd7c9a273d43189"
+  },
+  {
+    "image": "docker.io/portainer/portainer-ce:2.45.4",
+    "status": 200,
+    "digest": "sha256:18616fff2998f8ca0e8ebe7f028658ae1682859cf43f212f81a849c1093ad639"
+  },
+  {
+    "image": "docker.io/library/nginx:1.30-alpine",
+    "status": 200,
+    "digest": "sha256:8eb04fe3b385090e9aa02961f77398ad09b6bf33ab07f6669a5bb7acce22c0d3"
+  },
+  {
+    "image": "docker.io/library/node:24-alpine",
+    "status": 200,
+    "digest": "sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5"
+  },
+  {
+    "image": "docker.io/library/python:3.12-slim",
+    "status": 200,
+    "digest": "sha256:191083cdf6c7bda8c76158983163ead5d5cf7b77cf3033e805bb0f5296f51b4b"
+  },
+  {
+    "image": "ghcr.io/tecnativa/docker-socket-proxy:v0.4.1",
+    "status": 200,
+    "digest": "sha256:3400c429c5f9e1b21d62130fb93b16e2e772d4fb7695bd52fc2b743800b9fe9e"
+  },
+  {
+    "image": "gcr.io/cadvisor/cadvisor:v0.52.1",
+    "status": 200,
+    "digest": "sha256:f40e65878e25c2e78ea037f73a449527a0fb994e303dc3e34cb6b187b4b91435"
+  }
+]

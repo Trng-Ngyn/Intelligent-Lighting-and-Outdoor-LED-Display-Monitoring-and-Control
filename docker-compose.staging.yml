@@ -1,0 +1,216 @@
+name: pccom-staging
+x-logging: &logging
+  driver: json-file
+  options: {max-size: "10m", max-file: "3"}
+x-app: &app
+  image: pccom-staging-api:local
+  build: {context: ., dockerfile: deploy/staging/Dockerfile.api}
+  restart: unless-stopped
+  init: true
+  read_only: true
+  tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+  security_opt: ["no-new-privileges:true"]
+  logging: *logging
+  networks: [data]
+x-db: &db
+  PGHOST: timescaledb
+  PGPORT: "5432"
+  PGDATABASE: pccom_staging
+  PGSSLMODE: disable
+services:
+  timescaledb:
+    image: timescale/timescaledb:2.32.0-pg17@sha256:6a6b7d7a346d7c6be03a310c240706f3bbc6d7adbdf3fbc07823570b34337f5e
+    restart: unless-stopped
+    shm_size: 256mb
+    environment: {POSTGRES_USER: postgres, POSTGRES_DB: pccom_staging, POSTGRES_PASSWORD_FILE: /run/secrets/db_admin, TZ: UTC, PGTZ: UTC}
+    secrets: [db_admin]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck: {test: ["CMD-SHELL","pg_isready -U postgres -d pccom_staging"], interval: 5s, timeout: 5s, retries: 20}
+    logging: *logging
+    networks: [data]
+  migrate:
+    <<: *app
+    restart: "no"
+    environment:
+      <<: *db
+      PGUSER: postgres
+      PGPASSWORD_FILE: /run/secrets/db_admin
+      STAGING_DEMO: ${STAGING_DEMO:-0}
+      DEV_USER_ID: 00000000-0000-4000-8000-000000000001
+    command: ["python","tools/staging/migrate.py"]
+    secrets: [db_admin,db_api,db_ingestion]
+    volumes: ["./.staging/registry.json:/run/config/registry.json:ro"]
+    depends_on:
+      timescaledb: {condition: service_healthy}
+  mosquitto:
+    image: pccom-staging-mqtt:local
+    build: {context: ., dockerfile: deploy/staging/Dockerfile.mqtt}
+    restart: unless-stopped
+    ports: ["8883:8883"]
+    volumes:
+      - ./deploy/staging/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./.staging/acl:/run/config/acl:ro
+      - ./.staging/pki/server/ca.crt:/run/pki/ca.crt:ro
+      - ./.staging/pki/server/client.crt:/run/pki/server.crt:ro
+      - ./.staging/pki/server/client.key:/run/pki/server.key:ro
+      - ./.staging/pki/svc-health/ca.crt:/run/health/ca.crt:ro
+      - ./.staging/pki/svc-health/client.crt:/run/health/client.crt:ro
+      - ./.staging/pki/svc-health/client.key:/run/health/client.key:ro
+      - mqttdata:/mosquitto/data
+    healthcheck:
+      test: ["CMD","mosquitto_pub","-h","localhost","-p","8883","--cafile","/run/health/ca.crt","--cert","/run/health/client.crt","--key","/run/health/client.key","-q","1","-t","staging/health","-m","ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    logging: *logging
+    networks: [data]
+  ingestion:
+    <<: *app
+    environment:
+      <<: *db
+      PGUSER: pccom_ingestion
+      PGPASSWORD_FILE: /run/secrets/db_ingestion
+      SKIP_MIGRATIONS: "1"
+      INGESTION_ENFORCE_ROUTES: "1"
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "8883"
+      MQTT_TOPICS: "telemetry/v1/#,pccom/lighting/+/+/telemetry,pccom/v1/+/+/+/telemetry"
+      MQTT_CA_FILE: /run/pki/ca.crt
+      MQTT_CERT_FILE: /run/pki/client.crt
+      MQTT_KEY_FILE: /run/pki/client.key
+      BATCH_SIZE: "500"
+      FLUSH_SECONDS: "0.2"
+    command: ["python","-m","ingestion.worker"]
+    secrets: [db_ingestion]
+    volumes:
+      - ./.staging/pki/svc-ingestion/ca.crt:/run/pki/ca.crt:ro
+      - ./.staging/pki/svc-ingestion/client.crt:/run/pki/client.crt:ro
+      - ./.staging/pki/svc-ingestion/client.key:/run/pki/client.key:ro
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      mosquitto: {condition: service_healthy}
+    healthcheck: {test: ["CMD","python","src/ingestion/healthcheck.py"], interval: 10s, timeout: 5s, retries: 15}
+  api:
+    <<: *app
+    environment:
+      <<: *db
+      PGUSER: pccom_api
+      PGPASSWORD_FILE: /run/secrets/db_api
+      JWT_SECRET_FILE: /run/secrets/jwt
+      DEV_PASSWORD_FILE: /run/secrets/operator_password
+      DEV_USERNAME: staging-operator
+      DEV_USER_ID: 00000000-0000-4000-8000-000000000001
+      SIGNING_SECRET_FILE: /run/secrets/signing
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "8883"
+      MQTT_CA: /run/pki/ca.crt
+      MQTT_CERT: /run/pki/client.crt
+      MQTT_KEY: /run/pki/client.key
+    secrets: [db_api,jwt,operator_password,signing]
+    volumes:
+      - ./.staging/pki/svc-web-gateway/ca.crt:/run/pki/ca.crt:ro
+      - ./.staging/pki/svc-web-gateway/client.crt:/run/pki/client.crt:ro
+      - ./.staging/pki/svc-web-gateway/client.key:/run/pki/client.key:ro
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      mosquitto: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD","python","-c","import urllib.request,json; x=json.load(urllib.request.urlopen('http://localhost:8000/health',timeout=4)); assert x['mqtt']"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+  web:
+    image: pccom-staging-web:local
+    build: {context: ., dockerfile: deploy/staging/Dockerfile.web}
+    restart: unless-stopped
+    ports: ["443:8443"]
+    volumes:
+      - ./.staging/pki/server/client.crt:/run/pki/server.crt:ro
+      - ./.staging/pki/server/client.key:/run/pki/server.key:ro
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL","wget --no-check-certificate -qO- https://127.0.0.1:8443/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+    networks: [data]
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    restart: unless-stopped
+    command: ["--config.file=/etc/prometheus/prometheus.yml","--storage.tsdb.retention.time=15d"]
+    volumes: ["./deploy/staging/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro","./deploy/staging/monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro","promdata:/prometheus"]
+    ports: ["127.0.0.1:9090:9090"]
+    logging: *logging
+    networks: [data,monitor]
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.52.1
+    restart: unless-stopped
+    privileged: true
+    devices: ["/dev/kmsg:/dev/kmsg"]
+    volumes: ["/:/rootfs:ro","/var/run:/var/run:ro","/sys:/sys:ro","/var/lib/docker:/var/lib/docker:ro","/dev/disk:/dev/disk:ro"]
+    command: ["--docker_only=true","--housekeeping_interval=30s"]
+    logging: *logging
+    networks: [monitor]
+  socket-proxy:
+    image: ghcr.io/tecnativa/docker-socket-proxy:v0.4.1
+    restart: unless-stopped
+    environment: {CONTAINERS: "1", EVENTS: "1", INFO: "1", VERSION: "1", POST: "0"}
+    volumes: ["/var/run/docker.sock:/var/run/docker.sock:ro"]
+    logging: *logging
+    networks: [monitor]
+  loki:
+    image: grafana/loki:3.7.0
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki.yml"]
+    volumes: ["./deploy/staging/monitoring/loki.yml:/etc/loki/loki.yml:ro","lokidata:/loki"]
+    logging: *logging
+    networks: [monitor]
+  alloy:
+    image: grafana/alloy:v1.22.0
+    restart: unless-stopped
+    command: ["run","--storage.path=/var/lib/alloy","/etc/alloy/config.alloy"]
+    volumes: ["./deploy/staging/monitoring/config.alloy:/etc/alloy/config.alloy:ro","alloydata:/var/lib/alloy"]
+    depends_on: [loki,socket-proxy]
+    logging: *logging
+    networks: [monitor]
+  grafana:
+    image: grafana/grafana:12.0.2
+    restart: unless-stopped
+    environment: {GF_SECURITY_ADMIN_USER: staging-admin, GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_password, GF_USERS_ALLOW_SIGN_UP: "false"}
+    secrets: [grafana_password]
+    volumes:
+      - grafanadata:/var/lib/grafana
+      - ./deploy/staging/monitoring/datasources.yml:/etc/grafana/provisioning/datasources/staging.yml:ro
+      - ./deploy/staging/monitoring/dashboards.yml:/etc/grafana/provisioning/dashboards/staging.yml:ro
+      - ./deploy/staging/monitoring/overview.json:/var/lib/grafana/dashboards/staging.json:ro
+    ports: ["127.0.0.1:3000:3000"]
+    logging: *logging
+    networks: [monitor]
+  portainer:
+    image: portainer/portainer-ce:2.45.4
+    restart: unless-stopped
+    ports: ["127.0.0.1:9443:9443"]
+    volumes: ["portainerdata:/data","/var/run/docker.sock:/var/run/docker.sock"]
+    logging: *logging
+    networks: [monitor]
+volumes:
+  pgdata:
+  mqttdata:
+  promdata:
+  lokidata:
+  alloydata:
+  grafanadata:
+  portainerdata:
+networks:
+  data:
+  monitor:
+secrets:
+  db_admin: {file: ./.staging/secrets/db_admin}
+  db_api: {file: ./.staging/secrets/db_api}
+  db_ingestion: {file: ./.staging/secrets/db_ingestion}
+  jwt: {file: ./.staging/secrets/jwt}
+  operator_password: {file: ./.staging/secrets/operator_password}
+  signing: {file: ./.staging/secrets/signing}
+  grafana_password: {file: ./.staging/secrets/grafana_password}

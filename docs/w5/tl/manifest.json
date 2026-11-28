@@ -1,0 +1,389 @@
+{
+  "role": "W5-TL",
+  "date": "2026-11-27",
+  "base": "main 817aeb30dc1454dc704f92f05677cfcaf65971e0",
+  "install": "Extract at repository root, preserve paths; combine DE+FE+TL for staging integration. No secrets or generated binaries included.",
+  "files": [
+    {
+      "path": ".dockerignore",
+      "sha256": "4894f44e9ec9bcb277eea0998222feff3764fd06f3541bc5e5d17eec1f68d606",
+      "size": 107
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "60cbdbc32f1afec5109bcdb7d574a9980cb53be34dbb4a63db55ff448c2b12bf",
+      "size": 1097
+    },
+    {
+      "path": ".github/workflows/w5-staging.yml",
+      "sha256": "5960dd49da124beffd343218e467ae274209b093ed0ba43bf396e8674fcafc28",
+      "size": 3383
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "3935b85504edc128417d38637f34daf192e7225663fe93f408182f93cd895ab4",
+      "size": 381
+    },
+    {
+      "path": "database/staging/001_auth.sql",
+      "sha256": "9357d578631120f42657fbb59dd949aa5fcc3117db4f9e0ba2681a1ef55de4d9",
+      "size": 495
+    },
+    {
+      "path": "database/staging/002_console.sql",
+      "sha256": "fe66a2e60cc203eaceab221bd330449f300c82a927e37463053dc5397baeba2c",
+      "size": 1599
+    },
+    {
+      "path": "deploy/staging/Dockerfile.api",
+      "sha256": "7031aba45147b0a5cb98dc687a4ff33bf94346eefc55c6c7e0a0cdca0eb51e31",
+      "size": 799
+    },
+    {
+      "path": "deploy/staging/Dockerfile.mqtt",
+      "sha256": "0ca1802bdcc22dcfdf9e268aa6ac597b485f30bb8b55337725cb393b4a40429e",
+      "size": 371
+    },
+    {
+      "path": "deploy/staging/Dockerfile.web",
+      "sha256": "dd0265fb1b66c3205ca7719369c29baa89ea6a5aedfd71c6536a0efbfba1b897",
+      "size": 299
+    },
+    {
+      "path": "deploy/staging/monitoring/alerts.yml",
+      "sha256": "1d6e0974d3779fe07f71348b47307a13dffaf71d4031a052923d32d07879c1e0",
+      "size": 612
+    },
+    {
+      "path": "deploy/staging/monitoring/config.alloy",
+      "sha256": "b18dced2106c8d3f33b63135b7613ee5479a1700a7e85a7238318cb28f945d7b",
+      "size": 676
+    },
+    {
+      "path": "deploy/staging/monitoring/dashboards.yml",
+      "sha256": "41a2ff3b84ad22026dd135855ee01dd24f9806b025a7d401388534c1a05bac4f",
+      "size": 109
+    },
+    {
+      "path": "deploy/staging/monitoring/datasources.yml",
+      "sha256": "c94856270d6a95c19d8897073e1ce28359da07bad6ba695237304facfa44d79a",
+      "size": 287
+    },
+    {
+      "path": "deploy/staging/monitoring/loki.yml",
+      "sha256": "0723eea7194cfc69c14691aacada352b0ce8e0013971b2cb65d2d9c1595efb8f",
+      "size": 590
+    },
+    {
+      "path": "deploy/staging/monitoring/overview.json",
+      "sha256": "3302d31d6a998ec0957b7e29eef19c9f7214b89b9c3319a617abeac1280964d5",
+      "size": 1568
+    },
+    {
+      "path": "deploy/staging/monitoring/prometheus.yml",
+      "sha256": "7c3f49b8c01d35a88d8bb599e83d7aadbbe7b8246a345068d9164870a41fa2ac",
+      "size": 326
+    },
+    {
+      "path": "deploy/staging/mosquitto.conf",
+      "sha256": "19fe772c7e69d7709ecfd2b14bc3376c4aee3b06269d319bd939a45e2f34466b",
+      "size": 490
+    },
+    {
+      "path": "deploy/staging/nginx.conf",
+      "sha256": "0c5117ca23bf488d0424f1d9d0e0a8278542cdd5f5cfba2d31486f0c67ce1cdb",
+      "size": 912
+    },
+    {
+      "path": "deploy/staging/pccom-staging.service",
+      "sha256": "4cc5fa30abe3e3144df819d803b9823db21d529a41683b7e660e6570f9705da3",
+      "size": 525
+    },
+    {
+      "path": "deploy/staging/registry.example.json",
+      "sha256": "2365b5d1527d95868199aea50a2dc15ad8708bef28a9a0e06be54df9b811b6ff",
+      "size": 792
+    },
+    {
+      "path": "deploy/staging/retain_policy.c",
+      "sha256": "7c74c0d994bd13fd6002c56390df6b2b6af50877a27a658b83a70a148333db43",
+      "size": 2062,
+      "upstream": "Developer-1 dc9a26d1367c694cbfd637ef951eb87afbb0cb23 (copied unchanged)"
+    },
+    {
+      "path": "docker-compose.staging.test.yml",
+      "sha256": "71c3817f50df4b82ee90295ff27aa1fd1062807e6f41a59ab5861718ba03f7a3",
+      "size": 962
+    },
+    {
+      "path": "docker-compose.staging.yml",
+      "sha256": "a070daf76098349a329357c482cef13c2ff63025fe7af5b861dd14b4fb2f9a38",
+      "size": 8472
+    },
+    {
+      "path": "docs/test_reports/FIRMWARE_S1_VALIDATION.md",
+      "sha256": "725e616bd3fc41fa28cfe688194c82d468b7c54b572beea1f0378742ddebd159",
+      "size": 4858,
+      "upstream": "Developer-1 dc9a26d1367c694cbfd637ef951eb87afbb0cb23 (copied unchanged)"
+    },
+    {
+      "path": "docs/test_reports/LAB_S0_VALIDATION.md",
+      "sha256": "f4c314dabd98b99275e388cbd5f10fc73e23c1b62a763c5c2b88feff55a1300b",
+      "size": 3117,
+      "upstream": "Developer-1 dc9a26d1367c694cbfd637ef951eb87afbb0cb23 (copied unchanged)"
+    },
+    {
+      "path": "docs/w5/repository-review.json",
+      "sha256": "20908bdcde3490c53f289565e62585e6149bcf54fd7acd16004fc2e94b5210c7",
+      "size": 199316
+    },
+    {
+      "path": "docs/w5/tl/GUIDE.md",
+      "sha256": "b15e4ab3f261b20786791d4a89037b1d67c255bc5d33e5c6ac2bd6e5db493b2c",
+      "size": 10579
+    },
+    {
+      "path": "docs/w5/tl/TEST_REPORT.md",
+      "sha256": "4f6acb48e73c4a85c65a1ff0135468996f36864b66a24be29c0001b9f2031ce1",
+      "size": 6796
+    },
+    {
+      "path": "docs/w5/tl/evidence/assembly-build.txt",
+      "sha256": "584e88f1770e2063416ba75410df2e1173db65ba1948cf5a0b4d733ae5715ad6",
+      "size": 921
+    },
+    {
+      "path": "docs/w5/tl/evidence/assembly-tests.txt",
+      "sha256": "71b2cbea09dbb5d68fb3525ca9d1e33d3638cc130c68993076a7ac18108876dd",
+      "size": 950
+    },
+    {
+      "path": "docs/w5/tl/evidence/deploy-tests-final.txt",
+      "sha256": "56041c15bda5ccfa05ea907d093af21e007aeec84510a0f0ef1227db71b07712",
+      "size": 98
+    },
+    {
+      "path": "docs/w5/tl/evidence/image-manifests.json",
+      "sha256": "d9c6a4bd2bd3918a9e470431e530cd8c83ba01984ff08ec8887edfddc759a18c",
+      "size": 2023
+    },
+    {
+      "path": "docs/w5/tl/evidence/image-target-metadata.json",
+      "sha256": "e56fd127f33acf489445108d645eec3840e14bb7aaa3e09a6f9e47e81e3dc0e0",
+      "size": 407
+    },
+    {
+      "path": "docs/w5/tl/evidence/legacy-tests.txt",
+      "sha256": "d8e65ff2f8d5d1502f6e0b12c800a4dab237ec24abde10fee81bebcf30bcd4f4",
+      "size": 11111
+    },
+    {
+      "path": "docs/w5/tl/evidence/lint-final.txt",
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "size": 19
+    },
+    {
+      "path": "docs/w5/tl/evidence/native-acceptance.txt",
+      "sha256": "296958ea10e2b81aa60c6fb8c7e6a1d5fcf36401a0b0ea64db84602e66eddeea",
+      "size": 917
+    },
+    {
+      "path": "docs/w5/tl/evidence/native-result.json",
+      "sha256": "b1f52e1d665cf53e9f7b9c106631736cc02d53ebce745dfe02e7df722a8ff88e",
+      "size": 2143
+    },
+    {
+      "path": "docs/w5/tl/evidence/w5-tests.txt",
+      "sha256": "8929803a48e400583295ae0fd3ba668c4366c905773687fca82c3006c767284a",
+      "size": 1134
+    },
+    {
+      "path": "requirements-native-test.txt",
+      "sha256": "18a45680b7dee537f419f840a193d9437a289e78d82147deb6cfef14560f9457",
+      "size": 41
+    },
+    {
+      "path": "requirements-staging.txt",
+      "sha256": "6e22dee5eec400ccc64b0edcea026732cc3a0cc3008b32dedf1e539619f673e3",
+      "size": 83
+    },
+    {
+      "path": "requirements-test.txt",
+      "sha256": "13812c81f482187dbd0790aab8b10eb0ed16cdd293a3d5c60612bceaaad29b7a",
+      "size": 83
+    },
+    {
+      "path": "requirements-w5.txt",
+      "sha256": "403597f513e7c0a5ef463bde9eae2b23742e7102780cf73b5fba536d8b8c4fe4",
+      "size": 186,
+      "upstream": "SCRUM30 b328755a84d873ab8f1161689b16a39a95f70cc1; integration corrections documented"
+    },
+    {
+      "path": "src/backend/app/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0,
+      "upstream": "SCRUM30 b328755a84d873ab8f1161689b16a39a95f70cc1; integration corrections documented"
+    },
+    {
+      "path": "src/backend/app/core/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0,
+      "upstream": "SCRUM30 b328755a84d873ab8f1161689b16a39a95f70cc1; integration corrections documented"
+    },
+    {
+      "path": "src/backend/app/core/config.py",
+      "sha256": "ceb565bf289303bc58e818611b057d9321a5d12910553858fd7f1d52dcf0fc63",
+      "size": 679,
+      "upstream": "SCRUM30 b328755a84d873ab8f1161689b16a39a95f70cc1; integration corrections documented"
+    },
+    {
+      "path": "src/backend/app/core/security.py",
+      "sha256": "cf36b1369ca479f4f924c0b51452da5961cf8a11ecff40c72f548663b55173fe",
+      "size": 2755,
+      "upstream": "SCRUM30 b328755a84d873ab8f1161689b16a39a95f70cc1; integration corrections documented"
+    },
+    {
+      "path": "src/backend/app/db.py",
+      "sha256": "e0d16dfaf45dd7b9d5ff4c4f53034cd3d548d3bc9e1167ed78ba063fc6434ad0",
+      "size": 13532,
+      "upstream": "SCRUM30 b328755a84d873ab8f1161689b16a39a95f70cc1; integration corrections documented"
+    },
+    {
+      "path": "src/backend/app/routers/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0,
+      "upstream": "SCRUM30 b328755a84d873ab8f1161689b16a39a95f70cc1; integration corrections documented"
+    },
+    {
+      "path": "src/backend/app/routers/auth.py",
+      "sha256": "0f59c1b90af72004cc7e0d1e337290a780593f2843fd7ce07d20eebd257ab43d",
+      "size": 5426,
+      "upstream": "SCRUM30 b328755a84d873ab8f1161689b16a39a95f70cc1; integration corrections documented"
+    },
+    {
+      "path": "src/firmware_esp32/platformio.ini",
+      "sha256": "6faeade0aaddae54e2e0ec239642f9297399c8e599f924be541df675c9dfd822",
+      "size": 332
+    },
+    {
+      "path": "src/firmware_esp32_idf/CMakeLists.txt",
+      "sha256": "447bd7ed3da6759dd91264c4529b463e0b071be5d0143054c006d9640b751cd6",
+      "size": 114,
+      "upstream": "Developer-1 dc9a26d1367c694cbfd637ef951eb87afbb0cb23 (copied unchanged)"
+    },
+    {
+      "path": "src/firmware_esp32_idf/README.md",
+      "sha256": "8f76c073a6d5fd0746a67f402433275fa87ff869463f064a1ce8c7b829da1816",
+      "size": 2534,
+      "upstream": "Developer-1 dc9a26d1367c694cbfd637ef951eb87afbb0cb23 (copied unchanged)"
+    },
+    {
+      "path": "src/firmware_esp32_idf/main/CMakeLists.txt",
+      "sha256": "ecd9de083f85bf0202331332ef5ce78f331f3d26cc7b95544559232a378cad65",
+      "size": 65,
+      "upstream": "Developer-1 dc9a26d1367c694cbfd637ef951eb87afbb0cb23 (copied unchanged)"
+    },
+    {
+      "path": "src/firmware_esp32_idf/main/main.c",
+      "sha256": "56f66fe8c1eb7ddebe697346623af7396c32fabbd018581ddb7c8fc3c3376d80",
+      "size": 737,
+      "upstream": "Developer-1 dc9a26d1367c694cbfd637ef951eb87afbb0cb23 (copied unchanged)"
+    },
+    {
+      "path": "src/firmware_esp32_idf/partitions.csv",
+      "sha256": "c86c154b3d66d6d73646e6dced0bbb26be4bb2dddd2823f19d3d300f13f9718c",
+      "size": 420,
+      "upstream": "Developer-1 dc9a26d1367c694cbfd637ef951eb87afbb0cb23 (copied unchanged)"
+    },
+    {
+      "path": "src/firmware_esp32_idf/platformio.ini",
+      "sha256": "0095d62ae23e764499dd012ffca950b7180b9abc75543d3c254b71199289189a",
+      "size": 1204,
+      "upstream": "Developer-1 dc9a26d1367c694cbfd637ef951eb87afbb0cb23 (copied unchanged)"
+    },
+    {
+      "path": "src/firmware_esp32_idf/sdkconfig.defaults.common",
+      "sha256": "e0c5d5558e8accf97545339ee71c6788208f86168402066779cb5d8c16be166a",
+      "size": 888,
+      "upstream": "Developer-1 dc9a26d1367c694cbfd637ef951eb87afbb0cb23 (copied unchanged)"
+    },
+    {
+      "path": "src/firmware_esp32_idf/sdkconfig.defaults.dev",
+      "sha256": "6e93ccee18dcfd6dceb978c81fc5d1969646ea5a781d4fa50917acfdc2be89a6",
+      "size": 324,
+      "upstream": "Developer-1 dc9a26d1367c694cbfd637ef951eb87afbb0cb23 (copied unchanged)"
+    },
+    {
+      "path": "src/firmware_esp32_idf/sdkconfig.defaults.secure",
+      "sha256": "08647f5ff519fd1d9c4585cc66b759609035b5d3a1b152fb439d5dd654e4db21",
+      "size": 550,
+      "upstream": "Developer-1 dc9a26d1367c694cbfd637ef951eb87afbb0cb23 (copied unchanged)"
+    },
+    {
+      "path": "src/staging_api/__init__.py",
+      "sha256": "247d99a0a28e62cb5d6760a510bea036ce10e401d481f01a504ed94418377911",
+      "size": 79
+    },
+    {
+      "path": "src/staging_api/db.py",
+      "sha256": "b7b478451d3d422b168ea26f59ed6a4cf2576b78815f5f75710af4e4672aacdb",
+      "size": 952
+    },
+    {
+      "path": "src/staging_api/dispatcher.py",
+      "sha256": "261969baa7b78b2ff34fe28594abbc218ab1af91148301a8e93dc826f7a1ffe4",
+      "size": 10042
+    },
+    {
+      "path": "src/staging_api/main.py",
+      "sha256": "365a15e4f8b66b2c606ec6d088ef8f4f541bde36f304b25a631ed1c073a5cbf1",
+      "size": 11423
+    },
+    {
+      "path": "tests/w5/test_api.py",
+      "sha256": "f61109e1f6c6b0c5fc0072b42fe915da73084cae694c25c93b343d536f5f24ad",
+      "size": 7060
+    },
+    {
+      "path": "tests/w5/test_deployment.py",
+      "sha256": "6c37cd594ab5a40b407fe04bcb31e7b94d6b5604392e9bdd1ed428f96e0108b8",
+      "size": 2543
+    },
+    {
+      "path": "tools/staging/bootstrap.py",
+      "sha256": "69cc7bd708dbba43f9dc58ed5ec3ff7d8be8071c6bd83b520f120051bb6671ec",
+      "size": 7259
+    },
+    {
+      "path": "tools/staging/deploy.sh",
+      "sha256": "a29b2704d5daae0c95429c9f248a7cd795798fe3831b49e7fbad4c4770f15dc7",
+      "size": 688
+    },
+    {
+      "path": "tools/staging/evidence.sh",
+      "sha256": "a00b174d5b117642ae1f2c7748870d8fd5b60fd1f563be8509c313b25017f2a8",
+      "size": 737
+    },
+    {
+      "path": "tools/staging/install-host.sh",
+      "sha256": "ed5c83cbe2b4f4b66997fe72ef00a30422c016ba23b2685f2231496d675c67a3",
+      "size": 1443
+    },
+    {
+      "path": "tools/staging/migrate.py",
+      "sha256": "715f017a422fe6071dea8007cc3486cb9c00e3c32624db82adfc2d6d6a233988",
+      "size": 3676
+    },
+    {
+      "path": "tools/staging/native_acceptance.py",
+      "sha256": "ee05e0635594b76cafb99c5ea20b9ae9efdf178f75a32912cabe981ff967dfdd",
+      "size": 11647
+    },
+    {
+      "path": "tools/staging/verify.py",
+      "sha256": "b083804154e2c88857b88e98c026de30e565312d5c042a6e567aa271234f2443",
+      "size": 10011
+    }
+  ],
+  "revision": "2026-11-27 native MQTT/Timescale/browser acceptance passed"
+}

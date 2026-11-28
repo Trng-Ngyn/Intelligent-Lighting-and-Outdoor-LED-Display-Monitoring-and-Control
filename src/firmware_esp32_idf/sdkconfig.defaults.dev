@@ -1,0 +1,6 @@
+# Profile DEV / S1: flash encryption OFF, có thể nạp lại bằng pio run -t upload.
+# KHÔNG dùng profile này cho thiết bị field. Tên config đúng cho IDF 5.4 là
+# SECURE_FLASH_ENC_ENABLED (FLASH_ENCRYPTION_ENABLED là tên cũ).
+CONFIG_SECURE_FLASH_ENC_ENABLED=n
+CONFIG_NVS_ENCRYPTION=n
+CONFIG_SECURE_BOOT=n
