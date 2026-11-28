@@ -1,0 +1,10 @@
+# Profile SECURE / S2: flash encryption + NVS encryption, khóa sinh TRÊN CHIP.
+# Chỉ build/flash trên 1 bo dự phòng SAU KHI được duyệt riêng. Không burn eFuse
+# FLASH_CRYPT_CNT và không dùng file khóa trên host.
+#
+# Giữ chế độ DEVELOPMENT để ROM download mode vẫn nhận encrypted-app-flash do
+# IDF tự mã hóa bằng eFuse key; không dùng host key. Không bật secure boot ở S2.
+CONFIG_SECURE_FLASH_ENC_ENABLED=y
+CONFIG_SECURE_FLASH_ENCRYPTION_MODE_DEVELOPMENT=y
+CONFIG_SECURE_BOOT=n
+CONFIG_NVS_ENCRYPTION=y

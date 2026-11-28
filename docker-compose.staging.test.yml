@@ -1,0 +1,26 @@
+services:
+  verify:
+    image: pccom-staging-api:local
+    profiles: [test]
+    environment:
+      PGHOST: timescaledb
+      PGPORT: "5432"
+      PGDATABASE: pccom_staging
+      PGUSER: postgres
+      PGPASSWORD_FILE: /run/secrets/db_admin
+      STAGING_DEMO: "1"
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "8883"
+      MQTT_CA_FILE: /run/pki/ca.crt
+      MQTT_CERT_FILE: /run/pki/client.crt
+      MQTT_KEY_FILE: /run/pki/client.key
+    secrets: [db_admin,signing,operator_password]
+    volumes:
+      - ./.staging/registry.json:/run/config/registry.json:ro
+      - ./.staging/pki/svc-test/ca.crt:/run/pki/ca.crt:ro
+      - ./.staging/pki/svc-test/client.crt:/run/pki/client.crt:ro
+      - ./.staging/pki/svc-test/client.key:/run/pki/client.key:ro
+      - ./.staging/pki/svc-health/client.crt:/run/health/client.crt:ro
+      - ./.staging/pki/svc-health/client.key:/run/health/client.key:ro
+    command: ["python","tools/staging/verify.py"]
+    networks: [data]

@@ -1,0 +1,13 @@
+{
+  "uid": "pccom-staging", "title": "PCCOM Staging", "schemaVersion": 39,
+  "refresh": "15s", "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {"id":1,"title":"API available","type":"stat","datasource":{"uid":"prometheus"},"gridPos":{"x":0,"y":0,"w":6,"h":5},"targets":[{"expr":"up{job=\"pccom-api\"}"}]},
+    {"id":2,"title":"MQTT connected","type":"stat","datasource":{"uid":"prometheus"},"gridPos":{"x":6,"y":0,"w":6,"h":5},"targets":[{"expr":"pccom_mqtt_connected"}]},
+    {"id":3,"title":"Stored unique messages","type":"stat","datasource":{"uid":"prometheus"},"gridPos":{"x":12,"y":0,"w":6,"h":5},"targets":[{"expr":"pccom_receipts_total"}]},
+    {"id":4,"title":"Dead letter messages","type":"stat","datasource":{"uid":"prometheus"},"gridPos":{"x":18,"y":0,"w":6,"h":5},"targets":[{"expr":"pccom_dlq_total"}]},
+    {"id":5,"title":"Container CPU (cores)","type":"timeseries","datasource":{"uid":"prometheus"},"gridPos":{"x":0,"y":5,"w":12,"h":8},"targets":[{"expr":"rate(container_cpu_usage_seconds_total{container_label_com_docker_compose_project=\"pccom-staging\"}[2m])","legendFormat":"{{name}}"}]},
+    {"id":6,"title":"Container memory","type":"timeseries","datasource":{"uid":"prometheus"},"gridPos":{"x":12,"y":5,"w":12,"h":8},"targets":[{"expr":"container_memory_working_set_bytes{container_label_com_docker_compose_project=\"pccom-staging\"}","legendFormat":"{{name}}"}]},
+    {"id":7,"title":"Container logs","type":"logs","datasource":{"uid":"loki"},"gridPos":{"x":0,"y":13,"w":24,"h":10},"targets":[{"expr":"{container=~\".+\"}"}]}
+  ]
+}

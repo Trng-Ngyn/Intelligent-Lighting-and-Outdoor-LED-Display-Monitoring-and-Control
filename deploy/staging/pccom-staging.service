@@ -1,0 +1,17 @@
+[Unit]
+Description=PCCOM Docker Staging
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/pccom
+ExecStart=/usr/bin/docker compose --env-file .staging/compose.env -f docker-compose.staging.yml up -d --wait --wait-timeout 300
+ExecStop=/usr/bin/docker compose --env-file .staging/compose.env -f docker-compose.staging.yml stop --timeout 30
+TimeoutStartSec=360
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,15 @@
+{"migrated": true, "registered_assets": 3}
+Generated runtime files in /workspace/scratch/a5076e989fa2/tmp/native-tests/native-p27s2_8p/config. Keep .staging out of Git.
+PASS: 2 valid messages stored, 1 invalid message in DLQ; replay kept 2 rows.
+Sample interval energy: lighting = 2 Wh, LED = 3 Wh.
+{
+  "sent_unique": 10000,
+  "stored_unique": 10000,
+  "elapsed_seconds": 7.942,
+  "records_per_second": 1259.12,
+  "target_over_500": true
+}
+{"browser_api_mqtt_timescale": "PASS", "simulated_devices": true}
+{"synthetic_acceptance": "PASS", "mqtt_mtls": true, "benchmark_target": ">500/s", "mqtt_acl_negative": true, "automatic_hourly_aggregates": true, "single_and_group_telemetry_readback": true, "real_esp32_tested": false}
+{"native_integration": "PASS", "runtime_logs": "/workspace/scratch/a5076e989fa2/tmp/native-tests/native-p27s2_8p"}
+NATIVE_LOGS=/workspace/scratch/a5076e989fa2/tmp/native-tests/native-p27s2_8p
