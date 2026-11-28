@@ -1,0 +1,98 @@
+{
+  "collected_at": "2026-11-27T14:26:44.167051+00:00",
+  "runtime": "native processes, same component versions as target; not Docker/VPS/HIL",
+  "synthetic_devices": true,
+  "postgres": "17.11",
+  "timescaledb": "2.32.0",
+  "mosquitto": "2.0.22",
+  "hypertables": [
+    {
+      "hypertable_schema": "lighting",
+      "hypertable_name": "telemetry_led"
+    },
+    {
+      "hypertable_schema": "lighting",
+      "hypertable_name": "telemetry_lighting"
+    }
+  ],
+  "aggregate_jobs": [
+    {
+      "job_id": 1000,
+      "hypertable_name": "energy_lighting_hourly",
+      "schedule_interval": "0:15:00",
+      "scheduled": true,
+      "last_run_status": "Success"
+    },
+    {
+      "job_id": 1001,
+      "hypertable_name": "energy_lighting_daily",
+      "schedule_interval": "1:00:00",
+      "scheduled": true,
+      "last_run_status": "Success"
+    },
+    {
+      "job_id": 1002,
+      "hypertable_name": "energy_lighting_monthly",
+      "schedule_interval": "1 day, 0:00:00",
+      "scheduled": true,
+      "last_run_status": "Success"
+    },
+    {
+      "job_id": 1003,
+      "hypertable_name": "energy_led_hourly",
+      "schedule_interval": "0:15:00",
+      "scheduled": true,
+      "last_run_status": "Success"
+    },
+    {
+      "job_id": 1004,
+      "hypertable_name": "energy_led_daily",
+      "schedule_interval": "1:00:00",
+      "scheduled": true,
+      "last_run_status": "Success"
+    },
+    {
+      "job_id": 1005,
+      "hypertable_name": "energy_led_monthly",
+      "schedule_interval": "1 day, 0:00:00",
+      "scheduled": true,
+      "last_run_status": "Success"
+    }
+  ],
+  "commands": [
+    {
+      "brightness": 25,
+      "state": "verified",
+      "count": 1
+    },
+    {
+      "brightness": 50,
+      "state": "verified",
+      "count": 1
+    },
+    {
+      "brightness": 65,
+      "state": "verified",
+      "count": 2
+    },
+    {
+      "brightness": 100,
+      "state": "verified",
+      "count": 2
+    }
+  ],
+  "receipts": 10050,
+  "dlq": 1,
+  "aggregates": [
+    {
+      "kind": "lighting",
+      "rows": 4,
+      "mismatches": 0
+    },
+    {
+      "kind": "led",
+      "rows": 4,
+      "mismatches": 0
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+-r src/ingestion/requirements.txt
+pytest==9.2.0
+pgserver==0.1.4
