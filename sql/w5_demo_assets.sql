@@ -1,11 +1,11 @@
 BEGIN;
 
-INSERT INTO lighting.locations (tenant_id, site_id, location_id, name)
+INSERT INTO lighting.locations (tenant_id, site_id, location_id, name, latitude, longitude)
 VALUES (
     '11111111-1111-4111-8111-111111111111',
     '22222222-2222-4222-8222-222222222222',
     '33333333-3333-4333-8333-333333333333',
-    'W5-DE local demonstration'
+    'W5-DE local demonstration', 16.0678, 108.2240
 ) ON CONFLICT DO NOTHING;
 
 INSERT INTO lighting.firmware_versions (tenant_id, model, version)
@@ -33,5 +33,16 @@ VALUES
     '33333333-3333-4333-8333-333333333333',
     'W5-DEMO', '1.0.0', 'W5-DE local test', 'interval', now()
 ) ON CONFLICT DO NOTHING;
+
+INSERT INTO lighting.ingestion_bindings (
+    field_site, device_type, device_code, tenant_id, site_id, asset_id, device_id, is_demo
+) VALUES
+('W5_DEMO', 'light', 'W5_LIGHT_001',
+ '11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222',
+ '44444444-4444-4444-8444-444444444444', '66666666-6666-4666-8666-666666666666', true),
+('W5_DEMO', 'led_display', 'W5_LED_001',
+ '11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222',
+ '55555555-5555-4555-8555-555555555555', '77777777-7777-4777-8777-777777777777', true)
+ON CONFLICT DO NOTHING;
 
 COMMIT;

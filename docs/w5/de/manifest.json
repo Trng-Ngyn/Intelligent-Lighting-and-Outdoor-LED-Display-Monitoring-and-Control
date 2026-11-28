@@ -1,0 +1,154 @@
+{
+  "role": "W5-DE",
+  "date": "2026-11-27",
+  "base": "main 817aeb30dc1454dc704f92f05677cfcaf65971e0",
+  "install": "Extract at repository root, preserve paths; combine DE+FE+TL for staging integration. No secrets or generated binaries included.",
+  "files": [
+    {
+      "path": "deploy/mosquitto/w5/mosquitto.conf",
+      "sha256": "f9b869e7939858a67f8701e40712cc5c781d5cb53724c37f8b958f01dadf182e",
+      "size": 185
+    },
+    {
+      "path": "docker-compose.w5.services.yml",
+      "sha256": "5673d2b65cea6eedebcceb6a1df378298e3624704e39dd6891538e7f773181f4",
+      "size": 1320
+    },
+    {
+      "path": "docker-compose.w5.yml",
+      "sha256": "944dc005236b481836ef254c2f2c12179e7e9b0ae01310cd7905350176f87e9d",
+      "size": 617
+    },
+    {
+      "path": "docs/data_contracts/001_init.sql",
+      "sha256": "e115812f9250732f5917fa36208b8cba636e6c6c05a166648e7db7ffdd9833e9",
+      "size": 9945
+    },
+    {
+      "path": "docs/data_contracts/schemas/audit.event.v1.schema.json",
+      "sha256": "3ae20947aeb9a94a11b6465c6356d486f154977020ca871e951771278f90de07",
+      "size": 15469
+    },
+    {
+      "path": "docs/data_contracts/schemas/command.request.v1.schema.json",
+      "sha256": "a01d51dabcd76a70eef8f9251ff8271cfdb0d042901bb04928259b7974d155a3",
+      "size": 9590
+    },
+    {
+      "path": "docs/data_contracts/schemas/command.result.v1.schema.json",
+      "sha256": "b86f1715a6bc899d1e67546ef18d57f724314e6051c6815b2d2c779d729e58bb",
+      "size": 14278
+    },
+    {
+      "path": "docs/data_contracts/schemas/telemetry.led.v1.schema.json",
+      "sha256": "dd7bb15025076a43935e51052557777e8512eb3dcba78ee8b6e20198139644ab",
+      "size": 29735
+    },
+    {
+      "path": "docs/data_contracts/schemas/telemetry.lighting.v1.schema.json",
+      "sha256": "a29c61b94a3e9000244fe710e243a6c0a15ae5d84e52cbeea23eefdbde05ff1f",
+      "size": 21324
+    },
+    {
+      "path": "docs/w5/de/GUIDE.md",
+      "sha256": "d61d9ad55af6bc7cc7544bab67c64f3b2eb6b32c9a422937e0e3760a7204436d",
+      "size": 7872
+    },
+    {
+      "path": "docs/w5/de/TEST_REPORT.md",
+      "sha256": "3cd02fd2813b1f1a4f7415fc0e0b2218a2196db1361fd0ad2b008a9979e12579",
+      "size": 4814
+    },
+    {
+      "path": "docs/w5/de/evidence/native-acceptance.txt",
+      "sha256": "296958ea10e2b81aa60c6fb8c7e6a1d5fcf36401a0b0ea64db84602e66eddeea",
+      "size": 917
+    },
+    {
+      "path": "docs/w5/de/evidence/native-result.json",
+      "sha256": "b1f52e1d665cf53e9f7b9c106631736cc02d53ebce745dfe02e7df722a8ff88e",
+      "size": 2143
+    },
+    {
+      "path": "docs/w5/de/evidence/w5-tests.txt",
+      "sha256": "8929803a48e400583295ae0fd3ba668c4366c905773687fca82c3006c767284a",
+      "size": 1134
+    },
+    {
+      "path": "requirements-de-test.txt",
+      "sha256": "ee3f28764bbc6c6b495f590b10404d3b4a45ea5d368782636a2a2847b7a71e5c",
+      "size": 64
+    },
+    {
+      "path": "sql/w5_demo_assets.sql",
+      "sha256": "5d26fca054b9b8f99ad09f8b5d290afc400dfd0909410b91c3e7e6d6e2f60670",
+      "size": 1892
+    },
+    {
+      "path": "sql/w5_ingestion.sql",
+      "sha256": "af74dc948589811ac239789e3e11a4f50171e9840804c3abb7a4bb30dce2f044",
+      "size": 1816
+    },
+    {
+      "path": "src/ingestion/Dockerfile",
+      "sha256": "746c0dbc651f88424f4c1d531cabe90385653115aeb23bfd851f5c204cd364d5",
+      "size": 400
+    },
+    {
+      "path": "src/ingestion/adapters.py",
+      "sha256": "86519773fa046bbde45d145ee35448b7e5aa94faa5c8e76c409861a5c84ea156",
+      "size": 8775
+    },
+    {
+      "path": "src/ingestion/fixtures.py",
+      "sha256": "639308fa5daa5647f377708e6fb95bf7e207e35e7ed8c81401b00af05c1947f6",
+      "size": 1335
+    },
+    {
+      "path": "src/ingestion/healthcheck.py",
+      "sha256": "d2bb8eb3851eae675d4b19b17707de95f7794e6dd050514719b4250335ea27d8",
+      "size": 209
+    },
+    {
+      "path": "src/ingestion/publish_demo.py",
+      "sha256": "31e6ea4c8d1e2052c071a972373fc0be9d8aa97eaba18c9a37f4ada7f884df8a",
+      "size": 8321
+    },
+    {
+      "path": "src/ingestion/registers.py",
+      "sha256": "f4f320b402359327f890d5daf5bc33fbba9186b6bc966d2f90f043a80b8d9687",
+      "size": 4679
+    },
+    {
+      "path": "src/ingestion/registry.py",
+      "sha256": "d3dd8c407bb56d4694455086cb6892883375511aa7018b50b90f498aba5a2adc",
+      "size": 7151
+    },
+    {
+      "path": "src/ingestion/requirements.txt",
+      "sha256": "ed61b83818da40a8f16fa71f603ca47a8e68202cd1550658c9a7e9a2630e5f36",
+      "size": 68
+    },
+    {
+      "path": "src/ingestion/worker.py",
+      "sha256": "82c77bc146e505f53c297ba9c0d7de55f281e39bd7618b3a31ad2a7564dd1859",
+      "size": 20806
+    },
+    {
+      "path": "tests/w5/conftest.py",
+      "sha256": "4b821ee46e86b118a22e9e59ede0ad41afa151789c7c96adc33ab13c7c76ec5c",
+      "size": 3708
+    },
+    {
+      "path": "tests/w5/test_ingestion.py",
+      "sha256": "262f325fb3ce5de0379c8d1c0056268a966506f797590dd02a9cb8e717c00a72",
+      "size": 5524
+    },
+    {
+      "path": "tools/data/reconcile.py",
+      "sha256": "4f11fad94838ceb17f05904cfada36cc65d59243133c1bc69d87fde2406b0d0f",
+      "size": 1837
+    }
+  ],
+  "revision": "2026-11-27 native MQTT/Timescale/browser acceptance passed"
+}

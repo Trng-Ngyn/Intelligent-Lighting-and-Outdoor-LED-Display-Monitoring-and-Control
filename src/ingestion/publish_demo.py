@@ -11,7 +11,10 @@ from uuid import UUID, uuid4, uuid5
 
 import paho.mqtt.client as mqtt
 
-from worker import APP_DIR, database_connection, raw_fingerprint
+if __package__:
+    from .worker import APP_DIR, database_connection, raw_fingerprint
+else:
+    from worker import APP_DIR, database_connection, raw_fingerprint
 
 
 TENANT = "11111111-1111-4111-8111-111111111111"
@@ -198,7 +201,10 @@ def main():
         if not connected.wait(15):
             raise RuntimeError("Publisher could not connect to the broker")
         with database_connection() as connection:
-            connection.execute((APP_DIR / "w5_demo_assets.sql").read_text())
+            demo_file = APP_DIR / "w5_demo_assets.sql"
+            if not demo_file.exists():
+                demo_file = APP_DIR.parent.parent / "sql/w5_demo_assets.sql"
+            connection.execute(demo_file.read_text())
             if args.mode == "demo":
                 run_demo(client, connection)
             else:

@@ -21,10 +21,25 @@ import psycopg
 from psycopg import sql
 from psycopg.types.json import Jsonb
 from jsonschema import Draft7Validator, FormatChecker, ValidationError
+from psycopg.rows import dict_row
+
+if __package__:
+    from .adapters import TopicAdapter
+    from .registers import reconcile_registers
+else:
+    from adapters import TopicAdapter
+    from registers import reconcile_registers
 
 
 LOGGER = logging.getLogger("w5-ingestion")
 APP_DIR = Path(__file__).resolve().parent
+REPO_DIR = APP_DIR.parent.parent
+SCHEMA_DIR = Path(os.getenv("INGESTION_SCHEMA_DIR",
+    str(APP_DIR / "schemas" if (APP_DIR / "schemas").exists()
+        else REPO_DIR / "docs/data_contracts/schemas")))
+MIGRATION_FILE = Path(os.getenv("INGESTION_MIGRATION_FILE",
+    str(APP_DIR / "w5_ingestion.sql" if (APP_DIR / "w5_ingestion.sql").exists()
+        else REPO_DIR / "sql/w5_ingestion.sql")))
 READY_FILE = Path("/tmp/w5-ingestion-ready")
 KEY_COLUMNS = ("tenant_id", "site_id", "asset_id", "message_id")
 VALUE_COLUMNS = (
@@ -42,12 +57,15 @@ KIND_BY_MESSAGE = {"telemetry.lighting": "lighting", "telemetry.led": "led"}
 
 
 def database_connection():
+    password_file = os.getenv("PGPASSWORD_FILE")
+    password = Path(password_file).read_text().strip() if password_file else os.environ.get("PGPASSWORD", "")
     return psycopg.connect(
         host=os.getenv("PGHOST", "timescaledb"),
         port=int(os.getenv("PGPORT", "5432")),
         dbname=os.getenv("PGDATABASE", "pccom_staging"),
         user=os.getenv("PGUSER", "postgres"),
-        password=os.environ.get("PGPASSWORD", ""),
+        password=password,
+        sslmode=os.getenv("PGSSLMODE", "prefer"),
         connect_timeout=5,
         application_name="pccom-w5-ingestion",
         autocommit=True,
@@ -92,7 +110,8 @@ class Record:
 
 
 class PayloadValidator:
-    def __init__(self, schema_directory):
+    def __init__(self, schema_directory, adapter=None):
+        self.adapter = adapter
         self.validators = {}
         for message_type in KIND_BY_MESSAGE:
             path = schema_directory / f"{message_type}.v1.schema.json"
@@ -110,6 +129,9 @@ class PayloadValidator:
         )
         if not isinstance(payload, dict):
             raise ValueError("Telemetry must be a JSON object")
+        metadata = {"source_contract": "native"}
+        if self.adapter is not None:
+            payload, metadata = self.adapter.normalize(delivery.topic, payload, delivery.received_time)
         message_type = payload.get("message_type")
         if not isinstance(message_type, str) or message_type not in self.validators:
             raise ValueError("message_type must be telemetry.lighting or telemetry.led")
@@ -138,14 +160,22 @@ class PayloadValidator:
             name: metric["quality"] for name, metric in metrics.items()
         })
         values["details"] = Jsonb({
+            **metadata,
             "topic": delivery.topic,
             "input_received_time": payload["received_time"],
             "metrics": {name: value for name, value in metrics.items()
                         if name not in VALUE_COLUMNS},
+            "derive_register": values["energy_register_wh"] is not None
+                and values["energy_interval_wh"] is None,
+            "source_counter_epoch": str(values["counter_epoch"])
+                if values["counter_epoch"] else None,
         })
         # The receiver timestamp may change when the same source message is replayed.
         content = {name: value for name, value in payload.items()
                    if name != "received_time"}
+        if metadata.get("source_payload"):
+            content["_source"] = {name: value for name, value in metadata["source_payload"].items()
+                                  if name != "received_time"}
         digest = hashlib.sha256(json.dumps(
             content, sort_keys=True, separators=(",", ":"), allow_nan=False
         ).encode("utf-8")).hexdigest()
@@ -156,7 +186,10 @@ class BatchStore:
     def __init__(self, connection, validator):
         self.connection = connection
         self.validator = validator
-        connection.execute((APP_DIR / "w5_ingestion.sql").read_text())
+        self.last_route_refresh = 0
+        if os.getenv("SKIP_MIGRATIONS") != "1":
+            connection.execute(MIGRATION_FILE.read_text())
+        self.refresh_routes()
         connection.execute("""
             CREATE TEMP TABLE w5_batch
                 (LIKE lighting.telemetry_lighting INCLUDING DEFAULTS,
@@ -166,6 +199,18 @@ class BatchStore:
                 tenant_id uuid, site_id uuid, asset_id uuid, message_id uuid
             ) ON COMMIT DELETE ROWS;
         """)
+
+    def refresh_routes(self):
+        if self.validator.adapter is None or time.monotonic() - self.last_route_refresh < 5:
+            return
+        with self.connection.cursor(row_factory=dict_row) as cursor:
+            rows = cursor.execute("""
+                SELECT b.*, a.firmware FROM lighting.ingestion_bindings b
+                JOIN lighting.assets a USING (tenant_id, site_id, asset_id, device_id, kind)
+                WHERE a.retired_at IS NULL
+            """).fetchall()
+        self.validator.adapter.replace(rows)
+        self.last_route_refresh = time.monotonic()
 
     def save_dlq(self, delivery, reason):
         self.connection.execute("""
@@ -177,6 +222,7 @@ class BatchStore:
               delivery.payload, str(reason)[:2000], delivery.received_time))
 
     def save_batch(self, deliveries):
+        self.refresh_routes()
         records = {}
         invalid = []
         duplicate_count = 0
@@ -246,6 +292,16 @@ class BatchStore:
                 sql.SQL(", ").join(sql.Identifier("b", name) for name in ROW_COLUMNS),
             )
             inserted += self.connection.execute(query, (kind,)).rowcount
+        if inserted:
+            for kind in ("lighting", "led"):
+                affected = {}
+                for record in records:
+                    values = record.values
+                    if values["kind"] != kind or values["energy_register_wh"] is None:
+                        continue
+                    key = tuple(values[n] for n in ("tenant_id", "site_id", "asset_id"))
+                    affected[key] = min(affected.get(key, values["source_time"]), values["source_time"])
+                reconcile_registers(self.connection, kind, affected)
         return inserted, len(conflicts)
 
     def save_with_isolation(self, deliveries):
@@ -299,7 +355,8 @@ class IngestionWorker:
         self.messages = queue.Queue(maxsize=5000)
         self.batch_size = int(os.getenv("BATCH_SIZE", "500"))
         self.flush_seconds = float(os.getenv("FLUSH_SECONDS", "0.2"))
-        self.validator = PayloadValidator(APP_DIR / "schemas")
+        self.validator = PayloadValidator(SCHEMA_DIR, TopicAdapter(
+            enforce=os.getenv("INGESTION_ENFORCE_ROUTES", "0") == "1"))
         self.client = mqtt.Client(
             mqtt.CallbackAPIVersion.VERSION2,
             client_id=os.getenv("MQTT_CLIENT_ID", "pccom-w5-ingestion"),
@@ -327,7 +384,8 @@ class IngestionWorker:
         with self.generation_lock:
             self.generation += 1
         self.connected.set()
-        client.subscribe(os.getenv("MQTT_TOPIC", "telemetry/v1/#"), qos=1)
+        topics = os.getenv("MQTT_TOPICS", os.getenv("MQTT_TOPIC", "telemetry/v1/#"))
+        client.subscribe([(topic.strip(), 1) for topic in topics.split(",") if topic.strip()])
 
     def on_subscribe(self, client, userdata, mid, reason_codes, properties):
         if any(code.is_failure for code in reason_codes):
