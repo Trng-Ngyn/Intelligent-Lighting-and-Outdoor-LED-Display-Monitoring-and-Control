@@ -1,13 +1,15 @@
 # Firmware ESP32-WROOM-32 (ESP-IDF)
 
-Project thay thế dần `src/firmware_esp32/` (Arduino). Đã sang mốc **S2+S3:**
-telemetry Annex C, HMAC-SHA256, mTLS MQTT 5, đúng 3 task FreeRTOS và hardening
-(watchdog, timeout/retry, chính sách queue). Bằng chứng:
-`docs/test_reports/FIRMWARE_S1_VALIDATION.md`,
-`docs/test_reports/FIRMWARE_S2_VALIDATION.md` và (sau khi build) S3.
+Project thay thế dần `src/firmware_esp32/` (Arduino). Đã sang mốc **S2+S3+S4:**
+telemetry Annex C, HMAC-SHA256, mTLS MQTT 5, đúng 3 task FreeRTOS, hardening
+(watchdog, timeout/retry, chính sách queue), tool provisioning và build profile
+`secure`. Bằng chứng: `docs/test_reports/FIRMWARE_S1_VALIDATION.md`,
+`FIRMWARE_S2_VALIDATION.md`, `FIRMWARE_S3_VALIDATION.md`,
+`FIRMWARE_S4_VALIDATION.md`.
 
-**S2/S3 mới chỉ dừng ở mức build/kiểm chứng tĩnh.** Chưa nạp firmware, chưa chạy
-soak 4h trên bo thật, chưa build/flash profile `secure`, không `espefuse burn`.
+**S2/S3/S4 mới chỉ dừng ở mức build/kiểm chứng tĩnh.** Chưa nạp firmware, chưa
+chạy soak 4h trên bo thật. `esp32_secure` đã **build để kiểm chứng compile**,
+chưa flash, không `espefuse burn`, không burn `FLASH_CRYPT_CNT`.
 
 ## Toolchain
 
@@ -34,8 +36,9 @@ soak 4h trên bo thật, chưa build/flash profile `secure`, không `espefuse bu
 `sdkconfig.secure` (và thư mục build của env tương ứng) rồi build lại.**
 Nếu không, file sdkconfig đã sinh sẽ đè các giá trị defaults.
 
-profile `esp32_secure` chỉ dành cho 1 bo dự phòng ở S2, **không được flash khi
-chưa có phê duyệt riêng**. Không chạy `espefuse burn`, không burn `FLASH_CRYPT_CNT`.
+profile `esp32_secure` chỉ dành cho 1 bo dự phòng. Đã build ở S4 để kiểm chứng
+compile; **vẫn không được flash khi chưa có phê duyệt riêng**. Không chạy
+`espefuse burn`, không burn `FLASH_CRYPT_CNT`.
 
 ## Nạp lại sau khi bật flash encryption
 
@@ -137,6 +140,30 @@ echo nội dung khung**, không log mật khẩu/PEM/secret.
 
 Các giá trị được lưu vào namespace NVS `pccom_cfg`; sequence nằm ở
 `pccom_rt`. Với profile `secure`, NVS được mã hóa và khóa sinh trên chip.
+
+### Tool sinh khung (S4)
+
+Dùng `tools/provision_esp32.py` từ gốc repo. Tool bắt đầu bằng TLV version,
+tính CRC32-IEEE và **không in khung ra màn hình** (base64 không phải mã hóa);
+bắt buộc `--out <file>` hoặc `--port <serial>`:
+
+```powershell
+& '.\.venv\Scripts\python.exe' tools\provision_esp32.py `
+    --device-id LGT_NODE_001 --broker-host mqtt.example.test `
+    --broker-port 8883 --wifi-ssid LAB_WIFI `
+    --ca-pem generated\mqtt\field-ca.crt `
+    --cert-pem generated\test-clients\dev_SITE_01_LGT_NODE_001.crt `
+    --key-pem generated\test-clients\dev_SITE_01_LGT_NODE_001.key `
+    --signing-secret-file C:\secure\master.secret `
+    --wifi-pass-file C:\secure\wifi.pass `
+    --out C:\Users\DELL\AppData\Local\Temp\opencode\LGT_NODE_001.pccom-frame
+```
+
+Thay `--out` bằng `--port COM3` để đợi `+READY` rồi gửi khung và in phản hồi
+`+ACK` / `-ERR <mã>`. WiFi password và master secret đọc từ file, biến môi
+trường (`PCCOM_WIFI_PASS`, `PCCOM_SIGNING_SECRET`) hoặc prompt ẩn — không nhận
+qua đối số dòng lệnh. File khung có đuôi `*.pccom-frame` đã nằm trong
+`.gitignore`.
 
 Khi cần thay broker/dev/profile, phải xóa `sdkconfig.dev` / `sdkconfig.secure`
 và build lại env tương ứng như mô tả ở phần trên.

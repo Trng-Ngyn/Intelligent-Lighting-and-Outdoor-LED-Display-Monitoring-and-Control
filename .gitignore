@@ -41,3 +41,6 @@ htmlcov/
 /src/firmware_esp32_idf/sdkconfig.old
 /src/firmware_esp32_idf/dependencies.lock
 /src/firmware_esp32_idf/managed_components/
+
+# Khung provisioning chứa secret ở dạng base64 (có thể decode) — không commit.
+*.pccom-frame
