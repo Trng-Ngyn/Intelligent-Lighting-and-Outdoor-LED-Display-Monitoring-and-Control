@@ -11,6 +11,7 @@ services:
     command: ["-c", "/mosquitto/config/mosquitto.conf"]
     ports:
       - "127.0.0.1:8883:8883"
+      - "127.0.0.1:8885:8885"
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - ./acl.devices:/mosquitto/config/acl.devices:ro
@@ -53,6 +54,7 @@ services:
     profiles: [test]
     volumes:
       - ./generated/test-clients:/clients:ro
+      - ./generated/mqtt:/pki:ro
     read_only: true
     environment:
       HOME: /tmp

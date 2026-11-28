@@ -1,0 +1,2 @@
+# lab/check_alignment.py dùng paho-mqtt 2.x để kiểm tra MQTT 5 (User/Will properties).
+paho-mqtt>=2.1,<3

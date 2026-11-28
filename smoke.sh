@@ -2,7 +2,7 @@
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 
-compose=(docker compose --env-file compose.env -f compose.yml)
+compose=(docker compose --env-file compose.env -f docker-compose.lab.yml)
 api=https://edge-api.dev.pccom.test:8443/v1/edge/health
 pki=generated/test-clients
 request=(curl --noproxy '*' --silent --show-error --max-time 5
@@ -86,4 +86,26 @@ for forbidden_topic in \
 done
 printf '%s\n' 'MQTT 5: valid publish, command service, bridge ACL, cross-site denial and rejected CA/CRL checked.'
 
+# Field listener 8885: thiết bị southbound có cert riêng, chỉ viết topic của nó.
+field_device=dev_SITE_01_LGT_NODE_001
+field_bridge=field-bridge-s01
+field_telemetry=telemetry/v1/SITE_01/light/LGT_NODE_001
+field_status=status/v1/SITE_01/light/LGT_NODE_001
+field_cmd=commands/v1/SITE_01/light/LGT_NODE_001/dim
+for spec in "$field_device:$field_telemetry:" "$field_device:$field_status:-r" \
+  "$field_bridge:$field_cmd:"; do
+  IFS=: read -r certificate topic extra <<< "$spec"
+  # shellcheck disable=SC2086
+  field_result="$(mqtt_pub "$certificate" 8885 "$topic" $extra 2>&1)"
+  printf '%s\n' "$field_result" | grep -Ei 'PUBACK.*RC:[[:space:]]*(0|16)([^0-9]|$)'
+done
+for forbidden_topic in \
+  telemetry/v1/SITE_02/light/LGT_NODE_001 \
+  commands/v1/SITE_01/light/LGT_NODE_001/dim; do
+  denied="$(mqtt_pub "$field_device" 8885 "$forbidden_topic" 2>&1 || true)"
+  printf '%s\n' "$denied" | grep -Ei 'PUBACK.*RC:[[:space:]]*135([^0-9]|$)|Warning: Publish .*not authorized'
+done
+printf '%s\n' 'Field 8885: per-device cert, retained status, cross-site denial and command write checked.'
+
+# Topic alignment + LWT delay/retain được kiểm tra bằng paho trong alignment-tests.
 "${compose[@]}" run --rm --no-deps --build -T alignment-tests
