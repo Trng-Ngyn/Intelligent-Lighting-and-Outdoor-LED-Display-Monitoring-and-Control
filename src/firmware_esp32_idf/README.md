@@ -5,11 +5,14 @@ telemetry Annex C, HMAC-SHA256, mTLS MQTT 5, đúng 3 task FreeRTOS, hardening
 (watchdog, timeout/retry, chính sách queue), tool provisioning và build profile
 `secure`. Bằng chứng: `docs/test_reports/FIRMWARE_S1_VALIDATION.md`,
 `FIRMWARE_S2_VALIDATION.md`, `FIRMWARE_S3_VALIDATION.md`,
-`FIRMWARE_S4_VALIDATION.md`.
+`FIRMWARE_S4_VALIDATION.md`, và bảng tổng hợp
+`docs/test_reports/FIRMWARE_AUDIT_S0_S7.md`.
 
-**S2/S3/S4 mới chỉ dừng ở mức build/kiểm chứng tĩnh.** Chưa nạp firmware, chưa
-chạy soak 4h trên bo thật. `esp32_secure` đã **build để kiểm chứng compile**,
-chưa flash, không `espefuse burn`, không burn `FLASH_CRYPT_CNT`.
+**S2/S3/S4 mới chỉ dừng ở mức build/kiểm chứng tĩnh + lab.** Chưa nạp firmware,
+chưa provisioning/chạy soak 4h trên bo thật. `esp32_secure` đã **build để kiểm
+chứng compile**, chưa flash, không `espefuse burn`, không burn `FLASH_CRYPT_CNT`.
+Master secret chỉ tồn tại trên host: firmware nhận và lưu **device key 32 byte**
+đã dẫn xuất, không nhận/lưu master secret.
 
 ## Toolchain
 
@@ -96,12 +99,14 @@ Không có task thứ tư. MQTT client của ESP-IDF tự tạo task nội bộ 
 Phạm vi bản tin:
 
 - Publish `telemetry/v1/{site}/{type}/{id}`, QoS 1, retain false,
-  Content-Type `application/json`.
+  Content-Type `application/json`. Giá trị `ambient_lux` lấy từ ADC1_CH6
+  (GPIO34); serialize bằng buffer tĩnh, không cấp phát heap lúc đóng gói.
 - Publish `status/v1/{site}/{type}/{id}` = `online` lúc CONNECT và
   `offline` qua LWT, QoS 1, retain true, Will Delay Interval = 0, keepalive 15s.
 - Mọi bản tin có User Properties `correlation_id`, `ts_ms`, `signature`;
-  canonical `v1\n{topic}\n{cid}\n{ts_ms}\n{payload}`; khóa
-  `HMAC-SHA256(master_secret, "{site}/{type}/{id}")`.
+  canonical `v1\n{topic}\n{cid}\n{ts_ms}\n{payload}`; khóa là **device key**
+  `HMAC-SHA256(master_secret, "{site}/{type}/{id}")` do host dẫn xuất trước khi
+  provisioning. Firmware chỉ copy 32 byte từ NVS (`pccom_copy_device_key`).
 - **Không subscribe** `commands/v1/...`, không publish `dim/result`, không
   fallback offline. Topic/handler lệnh chỉ đặt chỗ trong `pccom_reserved.*`.
 
@@ -133,7 +138,7 @@ echo nội dung khung**, không log mật khẩu/PEM/secret.
 | 6 | CA PEM của broker | có |
 | 7 | client certificate PEM | có |
 | 8 | client private key PEM | có |
-| 9 | HMAC master secret | có |
+| 9 | device key 32 byte (đã dẫn xuất trên host) | có |
 | 10 | WiFi SSID | có |
 | 11 | WiFi password | có |
 | 12 | MQTT client id / username (CN cert) | có |
@@ -141,29 +146,60 @@ echo nội dung khung**, không log mật khẩu/PEM/secret.
 Các giá trị được lưu vào namespace NVS `pccom_cfg`; sequence nằm ở
 `pccom_rt`. Với profile `secure`, NVS được mã hóa và khóa sinh trên chip.
 
-### Tool sinh khung (S4)
+### Tool sinh khung (S4, cập nhật S2 device-key)
 
-Dùng `tools/provision_esp32.py` từ gốc repo. Tool bắt đầu bằng TLV version,
-tính CRC32-IEEE và **không in khung ra màn hình** (base64 không phải mã hóa);
-bắt buộc `--out <file>` hoặc `--port <serial>`:
+Dùng **`tools/provision.py`** từ gốc repo (tool cũ `provision_esp32.py` chỉ giữ
+lại để tương thích audit; nó gửi master secret dạng TLV tag 9 và **không còn
+nên dùng để nạp bo**). Tool mới:
+
+- dẫn xuất `device_key = HMAC-SHA256(master, "site/type/device")` trên host,
+  gửi đúng **32 byte** ở tag 9; master secret không bao giờ rời host;
+- chia TLV thành chunk ≤1024 byte, mỗi chunk có CRC32 riêng, kèm dòng tổng CRC;
+
+```text
+PCCOM:C<seq>/<total>:<base64(chunk)>,<crc32chunk>\n
+PCCOM:S<crc32(tổng TLV)>\n
+```
+
+Firmware trả `+OK` cho mỗi chunk, `+ACK` khi tổng CRC khớp và đã ghi NVS, hoặc
+`-ERR <mã>`. Vẫn nhận frame đơn cũ `PCCOM:<base64(TLV)>,<crc32>`.
 
 ```powershell
-& '.\.venv\Scripts\python.exe' tools\provision_esp32.py `
-    --device-id LGT_NODE_001 --broker-host mqtt.example.test `
-    --broker-port 8883 --wifi-ssid LAB_WIFI `
+# 1. Sinh khung vào file nhạy cảm (nằm ngoài repo)
+& '.\.venv\Scripts\python.exe' tools\provision.py build `
+    --device-id LGT_NODE_001 --broker-host mqtt.dev.pccom.test `
+    --broker-port 8885 --wifi-ssid LAB_WIFI `
     --ca-pem generated\mqtt\field-ca.crt `
     --cert-pem generated\test-clients\dev_SITE_01_LGT_NODE_001.crt `
     --key-pem generated\test-clients\dev_SITE_01_LGT_NODE_001.key `
     --signing-secret-file C:\secure\master.secret `
     --wifi-pass-file C:\secure\wifi.pass `
-    --out C:\Users\DELL\AppData\Local\Temp\opencode\LGT_NODE_001.pccom-frame
+    --out C:\secure\LGT_NODE_001.chunks
+
+# 2. Chỉ in metadata an toàn để đối chiếu trước khi nạp
+& '.\.venv\Scripts\python.exe' tools\provision.py show --in C:\secure\LGT_NODE_001.chunks
 ```
 
-Thay `--out` bằng `--port COM3` để đợi `+READY` rồi gửi khung và in phản hồi
-`+ACK` / `-ERR <mã>`. WiFi password và master secret đọc từ file, biến môi
-trường (`PCCOM_WIFI_PASS`, `PCCOM_SIGNING_SECRET`) hoặc prompt ẩn — không nhận
-qua đối số dòng lệnh. File khung có đuôi `*.pccom-frame` đã nằm trong
-`.gitignore`.
+`show` chỉ in `lines`, `tlv_bytes`, `tags`, `device_key_len`, `fingerprint` —
+không in PEM, key hay secret. Thay `--out` bằng `--port COMx` (ở lệnh `send`)
+để đợi `+READY`, gửi từng chunk và in phản hồi. WiFi password và master secret
+đọc từ file, biến môi trường (`PCCOM_WIFI_PASS`, `PCCOM_SIGNING_SECRET`) hoặc
+prompt ẩn — không nhận qua đối số dòng lệnh. File khung có đuôi `*.chunks` phải
+đặt ngoài repo.
+
+### Kiểm chứng host-side (không cần bo)
+
+- `python -m unittest tests.test_firmware_audit -v` (11 test: device key/chunk
+  CRC/`PROV SHOW` không lộ secret, payload qua jsonschema+`verify_envelope`,
+  hợp đồng S3/S5/S7 trong source).
+- `python -m unittest discover -s tests -p "test_*.py"` → 114 test OK.
+- `tools/negative_mtls_matrix.py --all` → 8/8 ca mTLS âm bị từ chối đúng mã lỗi
+  (chạy lab, không cần bo).
+- `tools/soak_collector.py --self-test 5 --interval-sec 1 --out <temp>.json`
+  kiểm tra collector bằng payload mẫu; **không** thay thế soak 4h trên bo.
+- `tools/verify_firmware_telemetry.py` kiểm chứng payload capture được: schema,
+  topic, User Properties, HMAC và sequence nối tiếp. Không in secret.
+- Quy trình S5–S7 khi có bo: `docs/test_reports/FIRMWARE_S5_S7_RUNBOOK.md`.
 
 Khi cần thay broker/dev/profile, phải xóa `sdkconfig.dev` / `sdkconfig.secure`
 và build lại env tương ứng như mô tả ở phần trên.

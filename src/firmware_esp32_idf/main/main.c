@@ -101,18 +101,21 @@ void app_main(void)
         ESP_LOGE(TAG, "không tạo/đăng ký được Network Manager task");
         return;
     }
+    ctx.net_task = net_task;
     ok = xTaskCreate(&pccom_ingestion_task, "pccom-ingest", 6144, &ctx, 5,
                      &ingest_task);
     if (ok != pdPASS || esp_task_wdt_add(ingest_task) != ESP_OK) {
         ESP_LOGE(TAG, "không tạo/đăng ký được Ingestion task");
         return;
     }
+    ctx.ingest_task = ingest_task;
     ok = xTaskCreate(&pccom_telemetry_task, "pccom-tele", 4096, &ctx, 5,
                      &tele_task);
     if (ok != pdPASS || esp_task_wdt_add(tele_task) != ESP_OK) {
         ESP_LOGE(TAG, "không tạo/đăng ký được Telemetry task");
         return;
     }
+    ctx.tele_task = tele_task;
 
     ESP_LOGI(TAG, "3 task ứng dụng đã khởi động (net/ingest/tele), TWDT %lums",
              (unsigned long)PCCOM_WDT_TIMEOUT_MS);

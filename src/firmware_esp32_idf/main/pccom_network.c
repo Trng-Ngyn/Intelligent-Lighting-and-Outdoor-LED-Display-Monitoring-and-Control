@@ -4,8 +4,10 @@
 #include <string.h>
 
 #include "esp_event.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "esp_random.h"
 #include "esp_sntp.h"
 #include "esp_task_wdt.h"
 #include "esp_wifi.h"
@@ -30,6 +32,42 @@ static const pccom_config_t *s_cfg;
 static pccom_context_t *s_ctx;
 static uint8_t s_device_key[32];
 static pccom_publish_item_t s_will_item;
+static TickType_t s_reconnect_due = 0;
+static uint32_t s_backoff_attempt = 0;
+static uint32_t s_auth_errors = 0;
+static bool s_fatal_auth = false;
+static bool s_ever_connected = false;
+
+/* Backoff 1 -> 2 -> 4 -> 8 -> 16 -> 30s + jitter 0..500ms. */
+static uint32_t reconnect_backoff_ms(void)
+{
+    uint32_t delay = PCCOM_BACKOFF_MIN_MS;
+    for (uint32_t i = 0; i < s_backoff_attempt && delay < PCCOM_BACKOFF_MAX_MS; ++i) {
+        delay *= 2;
+    }
+    if (delay > PCCOM_BACKOFF_MAX_MS) {
+        delay = PCCOM_BACKOFF_MAX_MS;
+    }
+    return delay + (esp_random() % (PCCOM_BACKOFF_JITTER_MS + 1));
+}
+
+/* Chỉ gọi bằng IP mới cần override CN; hostname dùng chính hostname trong URI.
+ * Không bao giờ tắt kiểm tra hostname/CN của chứng chỉ. */
+static bool is_ipv4_literal(const char *host)
+{
+    if (host == NULL || *host == '\0') {
+        return false;
+    }
+    int dots = 0;
+    for (const char *p = host; *p != '\0'; ++p) {
+        if (*p == '.') {
+            ++dots;
+        } else if (*p < '0' || *p > '9') {
+            return false;
+        }
+    }
+    return dots == 3;
+}
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data)
@@ -161,7 +199,15 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
     case MQTT_EVENT_CONNECTED: {
         if (ctx != NULL) {
             xEventGroupSetBits(ctx->events, PCCOM_MQTT_CONNECTED_BIT);
+            if (s_ever_connected) {
+                ctx->reconnect_count++;
+            }
         }
+        s_ever_connected = true;
+        s_backoff_attempt = 0;
+        s_auth_errors = 0;
+        s_fatal_auth = false;
+        s_reconnect_due = 0;
         ESP_LOGI(TAG, "MQTT 5 đã kết nối; keepalive=%ds", PCCOM_MQTT_KEEPALIVE_SEC);
 
         pccom_publish_item_t online;
@@ -177,7 +223,13 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
         if (ctx != NULL) {
             xEventGroupClearBits(ctx->events, PCCOM_MQTT_CONNECTED_BIT);
         }
-        ESP_LOGW(TAG, "MQTT mất kết nối; esp-mqtt sẽ tự reconnect");
+        if (!s_fatal_auth) {
+            uint32_t delay = reconnect_backoff_ms();
+            s_reconnect_due = xTaskGetTickCount() + pdMS_TO_TICKS(delay);
+            ESP_LOGW(TAG, "MQTT mất kết nối; retry sau %lums (attempt=%lu)",
+                     (unsigned long)delay, (unsigned long)s_backoff_attempt);
+            s_backoff_attempt++;
+        }
         break;
     case MQTT_EVENT_DATA: {
         /* S2 không subscribe; nhánh này chỉ để handler lệnh đặt chỗ không bị
@@ -202,10 +254,26 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
 #endif
         break;
     }
-    case MQTT_EVENT_ERROR:
-        ESP_LOGE(TAG, "MQTT_EVENT_ERROR error_type=%d",
-                 event->error_handle != NULL ? event->error_handle->error_type : -1);
+    case MQTT_EVENT_ERROR: {
+        int error_type = event->error_handle != NULL ? event->error_handle->error_type : -1;
+        ESP_LOGE(TAG, "MQTT_EVENT_ERROR error_type=%d", error_type);
+        /* CONNACK bị từ chối (auth/sai cert) hoặc 3 lỗi TLS/MQTT liên tiếp:
+         * dừng retry thay vì reconnect vô hạn. */
+        if (error_type == MQTT_ERROR_TYPE_CONNECTION_REFUSED) {
+            s_fatal_auth = true;
+        } else if (error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
+            s_auth_errors++;
+            if (s_auth_errors >= 3) {
+                s_fatal_auth = true;
+            }
+        }
+        if (s_fatal_auth && g_client != NULL) {
+            s_reconnect_due = 0;
+            (void)esp_mqtt_client_stop(g_client);
+            ESP_LOGE(TAG, "lỗi auth/cert: đã dừng reconnect; cần provisioning lại");
+        }
         break;
+    }
     default:
         break;
     }
@@ -216,12 +284,26 @@ static void log_runtime_counters(void)
     if (s_ctx == NULL) {
         return;
     }
-    ESP_LOGI(TAG, "stats: published=%lu fail=%lu drop_pub=%lu drop_sample=%lu net_retry=%lu",
-             (unsigned long)s_ctx->published,
+    TaskHandle_t net_task = s_ctx->net_task;
+    TaskHandle_t ingest_task = s_ctx->ingest_task;
+    TaskHandle_t tele_task = s_ctx->tele_task;
+    TaskHandle_t mqtt_task = xTaskGetHandle(PCCOM_MQTT_TASK_NAME);
+
+    ESP_LOGI(TAG,
+             "stats: free_heap=%u min_free_heap=%u largest_block=%u "
+             "reconnect=%lu publish_fail=%lu queue_overflow=%lu net_retry=%lu "
+             "stack_min net=%u ingest=%u tele=%u mqtt=%u",
+             (unsigned int)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned int)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned int)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
+             (unsigned long)s_ctx->reconnect_count,
              (unsigned long)s_ctx->publish_failures,
-             (unsigned long)s_ctx->dropped_publishes,
-             (unsigned long)s_ctx->dropped_samples,
-             (unsigned long)s_ctx->net_retries);
+             (unsigned long)s_ctx->queue_overflow,
+             (unsigned long)s_ctx->net_retries,
+             (unsigned int)(net_task != NULL ? uxTaskGetStackHighWaterMark(net_task) : 0),
+             (unsigned int)(ingest_task != NULL ? uxTaskGetStackHighWaterMark(ingest_task) : 0),
+             (unsigned int)(tele_task != NULL ? uxTaskGetStackHighWaterMark(tele_task) : 0),
+             (unsigned int)(mqtt_task != NULL ? uxTaskGetStackHighWaterMark(mqtt_task) : 0));
 }
 
 static esp_err_t start_wifi_and_time(pccom_context_t *ctx)
@@ -276,6 +358,8 @@ static esp_err_t start_wifi_and_time(pccom_context_t *ctx)
     if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
         return err;
     }
+    /* Soak 4h: tắt WiFi power save để đo heap không bị nhiễu bởi chu kỳ sleep. */
+    (void)esp_wifi_set_ps(WIFI_PS_NONE);
 
     esp_sntp_set_sync_mode(SNTP_SYNC_MODE_IMMED);
     esp_sntp_setservername(0, "pool.ntp.org");
@@ -349,9 +433,9 @@ void pccom_network_task(void *arg)
         return;
     }
 
-    esp_err_t err = pccom_derive_device_key(s_cfg, s_device_key);
+    esp_err_t err = pccom_copy_device_key(s_cfg, s_device_key);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "không dẫn xuất được device key: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "không đọc được device key từ NVS: %s", esp_err_to_name(err));
         (void)esp_task_wdt_delete(NULL); /* tránh entry TWDT của task đã chết */
         vTaskDelete(NULL);
         return;
@@ -377,10 +461,16 @@ void pccom_network_task(void *arg)
     snprintf(broker_uri, sizeof(broker_uri), "mqtts://%s:%u",
              s_cfg->broker_host, (unsigned int)s_cfg->broker_port);
 
+    /* certificate_common_name: esp-mqtt gọi trường này là common_name. Khi broker
+     * được gọi bằng IP, vẫn verify hostname lab thay vì tắt kiểm tra CN. */
+    const char *verify_cn = is_ipv4_literal(s_cfg->broker_host)
+                                ? PCCOM_CERT_COMMON_NAME : NULL;
+
     esp_mqtt_client_config_t mqtt_cfg = {
         .broker.address.uri = broker_uri,
         .broker.verification.certificate = s_cfg->ca_pem,
         .broker.verification.certificate_len = s_cfg->ca_len,
+        .broker.verification.common_name = verify_cn,
         .credentials.username = s_cfg->client_id,
         .credentials.client_id = s_cfg->client_id,
         .credentials.authentication.certificate = s_cfg->cert_pem,
@@ -394,7 +484,7 @@ void pccom_network_task(void *arg)
         .session.last_will.retain = 1,
         .session.keepalive = PCCOM_MQTT_KEEPALIVE_SEC,
         .session.protocol_ver = MQTT_PROTOCOL_V_5,
-        .network.reconnect_timeout_ms = 5000,
+        .network.reconnect_timeout_ms = PCCOM_BACKOFF_MIN_MS,
         .task.stack_size = 8192,
         .buffer.size = 2048,
         .buffer.out_size = 2048,
@@ -469,6 +559,11 @@ void pccom_network_task(void *arg)
     TickType_t next_stats = xTaskGetTickCount() + pdMS_TO_TICKS(PCCOM_STATS_LOG_MS);
     for (;;) {
         (void)esp_task_wdt_reset();
+        if (s_reconnect_due != 0 && !s_fatal_auth &&
+            xTaskGetTickCount() >= s_reconnect_due) {
+            s_reconnect_due = 0;
+            (void)esp_mqtt_client_reconnect(g_client);
+        }
         if (xTaskGetTickCount() >= next_stats) {
             next_stats += pdMS_TO_TICKS(PCCOM_STATS_LOG_MS);
             log_runtime_counters();
@@ -480,6 +575,7 @@ void pccom_network_task(void *arg)
         EventBits_t bits = xEventGroupGetBits(ctx->events);
         if ((bits & PCCOM_MQTT_CONNECTED_BIT) == 0) {
             ctx->dropped_publishes++;
+            ctx->queue_overflow++;
             ESP_LOGW(TAG, "bỏ bản tin %s: MQTT chưa kết nối (không đệm offline)",
                      item.topic);
             continue;

@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import binascii
 import getpass
 import os
 import re
@@ -189,6 +190,57 @@ def build_frame(args: argparse.Namespace) -> tuple[bytes, int, int]:
         + b"\n"
     )
     return frame, len(tlv), crc
+
+
+def parse_frame(frame: bytes) -> dict[int, bytes]:
+    """Đọc lại khung do `build_frame` sinh, trả `{tag: value}`.
+
+    Bắt chước trình tự kiểm tra của `pccom_provision.c`: prefix → base64 → CRC
+    → TLV, trong đó TLV đầu tiên bắt buộc là version=1. Lỗi dùng cùng mã với
+    firmware (`BAD_FRAME`, `BAD_BASE64`, `CRC_MISMATCH`, `BAD_TLV`) để test
+    host-side có thể sinh khung tiêu cực cho S5. Không trả/error chứa secret.
+    """
+    line = frame.strip()
+    if not line.startswith(FRAME_PREFIX):
+        raise ProvisioningError("BAD_FRAME")
+    rest = line[len(FRAME_PREFIX):]
+    if b"," not in rest:
+        raise ProvisioningError("BAD_FRAME")
+    encoded, crc_text = rest.rsplit(b",", 1)
+    try:
+        decoded = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ProvisioningError("BAD_BASE64") from exc
+    if len(crc_text) != 8:
+        raise ProvisioningError("BAD_FRAME")
+    try:
+        expected_crc = int(crc_text.decode("ascii"), 16)
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise ProvisioningError("BAD_FRAME") from exc
+    if zlib.crc32(decoded) & 0xFFFFFFFF != expected_crc:
+        raise ProvisioningError("CRC_MISMATCH")
+
+    fields: dict[int, bytes] = {}
+    offset = 0
+    while offset < len(decoded):
+        if len(decoded) - offset < 3:
+            raise ProvisioningError("BAD_TLV")
+        tag = decoded[offset]
+        length = struct.unpack(">H", decoded[offset + 1:offset + 3])[0]
+        offset += 3
+        if length > len(decoded) - offset:
+            raise ProvisioningError("BAD_TLV")
+        value = decoded[offset:offset + length]
+        offset += length
+        if not fields:
+            if tag != TAG_VERSION or length != 1 or value != bytes([PROVISION_VERSION]):
+                raise ProvisioningError("BAD_TLV")
+        elif tag == TAG_VERSION:
+            raise ProvisioningError("BAD_TLV")
+        fields[tag] = value
+    if not fields:
+        raise ProvisioningError("BAD_TLV")
+    return fields
 
 
 def _write_file(frame: bytes, out_path: str) -> None:

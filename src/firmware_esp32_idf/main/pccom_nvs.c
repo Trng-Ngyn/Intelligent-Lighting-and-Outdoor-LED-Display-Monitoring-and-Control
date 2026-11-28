@@ -21,7 +21,7 @@ static const char *KEY_PASS = "pass";
 static const char *KEY_CA = "ca_pem";
 static const char *KEY_CERT = "cert_pem";
 static const char *KEY_KEY = "key_pem";
-static const char *KEY_SECRET = "sign_secret";
+static const char *KEY_DEVICE_KEY = "device_key";
 
 static esp_err_t open_namespace(nvs_open_mode_t mode, nvs_handle_t *handle)
 {
@@ -83,16 +83,13 @@ void pccom_config_free(pccom_config_t *cfg)
         free(cfg->key_pem);
         cfg->key_pem = NULL;
     }
-    if (cfg->signing_secret != NULL) {
-        /* Xóa byte secret khỏi heap trước khi trả lại allocator. */
-        memset(cfg->signing_secret, 0, cfg->signing_secret_len);
-        free(cfg->signing_secret);
-        cfg->signing_secret = NULL;
-    }
+    /* Device key nằm trong struct tĩnh, không cấp phát heap; vẫn xóa byte khi
+     * giải phóng cấu hình. Master secret không bao giờ được lưu ở đây. */
+    memset(cfg->device_key, 0, sizeof(cfg->device_key));
+    cfg->has_device_key = false;
     cfg->ca_len = 0;
     cfg->cert_len = 0;
     cfg->key_len = 0;
-    cfg->signing_secret_len = 0;
 }
 
 bool pccom_config_is_valid(const pccom_config_t *cfg)
@@ -102,8 +99,7 @@ bool pccom_config_is_valid(const pccom_config_t *cfg)
            cfg->broker_host[0] != '\0' && cfg->broker_port != 0 &&
            cfg->wifi_ssid[0] != '\0' && cfg->ca_pem != NULL && cfg->ca_len > 0 &&
            cfg->cert_pem != NULL && cfg->cert_len > 0 && cfg->key_pem != NULL &&
-           cfg->key_len > 0 && cfg->signing_secret != NULL &&
-           cfg->signing_secret_len > 0;
+           cfg->key_len > 0 && cfg->has_device_key;
 }
 
 esp_err_t pccom_nvs_init(void)
@@ -131,7 +127,7 @@ bool pccom_nvs_has_config(void)
     size_t len = 0;
     esp_err_t err = nvs_get_str(h, KEY_SITE, NULL, &len);
     if (err == ESP_OK) {
-        err = nvs_get_blob(h, KEY_SECRET, NULL, &len);
+        err = nvs_get_blob(h, KEY_DEVICE_KEY, NULL, &len);
     }
     nvs_close(h);
     return err == ESP_OK;
@@ -169,7 +165,14 @@ esp_err_t pccom_nvs_load(pccom_config_t *cfg)
         err = read_blob(h, KEY_KEY, (uint8_t **)&cfg->key_pem, &cfg->key_len);
     }
     if (err == ESP_OK) {
-        err = read_blob(h, KEY_SECRET, &cfg->signing_secret, &cfg->signing_secret_len);
+        size_t key_len = sizeof(cfg->device_key);
+        err = nvs_get_blob(h, KEY_DEVICE_KEY, cfg->device_key, &key_len);
+        if (err == ESP_OK && key_len != sizeof(cfg->device_key)) {
+            err = ESP_ERR_INVALID_SIZE;
+        }
+        if (err == ESP_OK) {
+            cfg->has_device_key = true;
+        }
     }
     nvs_close(h);
 
@@ -211,8 +214,9 @@ esp_err_t pccom_nvs_save(const pccom_config_t *cfg)
     if (err == ESP_OK) err = nvs_set_blob(h, KEY_CA, cfg->ca_pem, cfg->ca_len);
     if (err == ESP_OK) err = nvs_set_blob(h, KEY_CERT, cfg->cert_pem, cfg->cert_len);
     if (err == ESP_OK) err = nvs_set_blob(h, KEY_KEY, cfg->key_pem, cfg->key_len);
-    if (err == ESP_OK) {
-        err = nvs_set_blob(h, KEY_SECRET, cfg->signing_secret, cfg->signing_secret_len);
+    if (err == ESP_OK && cfg->has_device_key) {
+        err = nvs_set_blob(h, KEY_DEVICE_KEY, cfg->device_key,
+                           sizeof(cfg->device_key));
     }
     if (err == ESP_OK) {
         err = nvs_commit(h);
@@ -223,7 +227,7 @@ esp_err_t pccom_nvs_save(const pccom_config_t *cfg)
         ESP_LOGE(TAG, "lưu cấu hình failed: %s", esp_err_to_name(err));
         return err;
     }
-    ESP_LOGI(TAG, "đã lưu cấu hình vào NVS (secret/PEM không được log)");
+    ESP_LOGI(TAG, "đã lưu cấu hình vào NVS (device key/PEM không được log)");
     return ESP_OK;
 }
 

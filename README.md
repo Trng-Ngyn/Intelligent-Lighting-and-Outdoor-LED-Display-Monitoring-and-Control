@@ -51,6 +51,7 @@ An integrated IoT and cloud platform designed to monitor and manage outdoor smar
 │   ├── edge_simulator/     # Virtual Edge Simulator MQTT 5 (đèn/LED/gateway)
 │   ├── backend/            # Mock Cloud Service & Core API
 │   ├── firmware_esp32/     # Firmware gateway/controller ESP32 + C++ lighting modules
+│   ├── firmware_esp32_idf/ # Firmware ESP32-WROOM-32 (ESP-IDF 5.4, mTLS/MQTT 5)
 │   └── frontend/           # Web Console & GIS Dashboard
 ├── tests/                  # Unit test giao thức và cấu hình simulator
 └── tools/                  # Probe MQTT 5, script Jira, tạo repo GitHub
@@ -64,6 +65,12 @@ An integrated IoT and cloud platform designed to monitor and manage outdoor smar
 - **Safety Supervisor:** `src/lighting_control/safety/` (Python) và `src/firmware_esp32/{include,src}/lighting_control/` (C++). Tài liệu: [`src/lighting_control/safety/README.md`](src/lighting_control/safety/README.md).
 - Unit tests `Safety Supervisor` : `tests/test_safety_supervisor.py`; C++ host harness: `tests/cpp/test_safety_supervisor.cpp`.
 - Lưu ý: Safety Supervisor đã được triển khai và kiểm thử độc lập, nhưng chưa được nối vào `main.cpp`. Firmware `main.cpp` vẫn là luồng PWM cũ cho đến khi hoàn tất tích hợp, đặc tả đường cong và adapter/transceiver DALI thực tế. Các module mới chưa được coi là nghiệm thu điều khiển DALI trên phần cứng.
+
+## 📟 Firmware ESP32-WROOM-32 (ESP-IDF) — S0→S7
+- README firmware/tool: [`src/firmware_esp32_idf/README.md`](src/firmware_esp32_idf/README.md)
+- Bảng audit S0–S7 + danh sách `CẦN BO`: [`docs/test_reports/FIRMWARE_AUDIT_S0_S7.md`](docs/test_reports/FIRMWARE_AUDIT_S0_S7.md)
+- Runbook S5–S7 (khi có bo): [`docs/test_reports/FIRMWARE_S5_S7_RUNBOOK.md`](docs/test_reports/FIRMWARE_S5_S7_RUNBOOK.md)
+- Trạng thái: S0/S1 `PASS`; S2–S4 `PASS` phần host/lab, runtime `CẦN BO`; S5/S6/S7 `CẦN BO` phần cứng/phê duyệt. Master secret chỉ tồn tại trên host, firmware nhận device key 32 byte. Không flash profile `secure` khi chưa có phê duyệt riêng.
 
 ## 🔌 MQTT 5 Protocol & Simulator
 - Đặc tả giao thức: [`docs/specifications/MQTT5_COMMUNICATION_PROTOCOL.md`](docs/specifications/MQTT5_COMMUNICATION_PROTOCOL.md)

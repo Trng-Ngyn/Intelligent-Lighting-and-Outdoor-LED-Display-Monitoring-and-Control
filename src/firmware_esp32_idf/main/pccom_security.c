@@ -11,30 +11,12 @@
 
 static const char *TAG = "pccom-security";
 
-esp_err_t pccom_derive_device_key(const pccom_config_t *cfg, uint8_t key[32])
+esp_err_t pccom_copy_device_key(const pccom_config_t *cfg, uint8_t key[32])
 {
-    if (cfg == NULL || !pccom_config_is_valid(cfg) || key == NULL) {
+    if (cfg == NULL || !cfg->has_device_key || key == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
-
-    char identity[3 * PCCOM_ID_MAX];
-    int written = snprintf(identity, sizeof(identity), "%s/%s/%s",
-                           cfg->site_id, cfg->device_type, cfg->device_id);
-    if (written < 0 || written >= (int)sizeof(identity)) {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    const mbedtls_md_info_t *info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
-    if (info == NULL) {
-        return ESP_ERR_NOT_SUPPORTED;
-    }
-    int ret = mbedtls_md_hmac(info,
-                              cfg->signing_secret, cfg->signing_secret_len,
-                              (const unsigned char *)identity, strlen(identity), key);
-    if (ret != 0) {
-        ESP_LOGE(TAG, "HMAC derive failed: -0x%04x", (unsigned int)-ret);
-        return ESP_FAIL;
-    }
+    memcpy(key, cfg->device_key, sizeof(cfg->device_key));
     return ESP_OK;
 }
 
@@ -124,8 +106,9 @@ void pccom_new_uuid4(char out[37])
 
 bool pccom_security_selftest(void)
 {
-    /* Public test vector: key = 0x00..0x1f, canonical = v1\n...\npccom-selftest-payload.
-     * Giá trị expected được sinh bằng src/iot_protocol/signing.py. */
+    /* Public test vector: key là device key đã dẫn xuất (không phải master
+     * secret; giá trị 0x00..0x1f chỉ là vector công khai để đối chiếu HMAC C
+     * với Python). canonical = v1\n...\npccom-selftest-payload. */
     static const uint8_t key[32] = {
         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
         0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,

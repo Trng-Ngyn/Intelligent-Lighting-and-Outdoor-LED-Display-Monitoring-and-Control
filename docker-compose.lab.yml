@@ -54,6 +54,7 @@ services:
     profiles: [test]
     volumes:
       - ./generated/test-clients:/clients:ro
+      - ./generated/mqtt:/pki:ro
     read_only: true
     environment:
       HOME: /tmp

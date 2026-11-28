@@ -34,7 +34,7 @@ enum {
     TLV_CA_PEM = 6,
     TLV_CLIENT_CERT = 7,
     TLV_CLIENT_KEY = 8,
-    TLV_SIGNING_SECRET = 9,
+    TLV_DEVICE_KEY = 9,   /* 32 byte, đã dẫn xuất trên host; KHÔNG phải master */
     TLV_WIFI_SSID = 10,
     TLV_WIFI_PASS = 11,
     TLV_CLIENT_ID = 12
@@ -202,8 +202,13 @@ static bool parse_tlv(const uint8_t *data, size_t len, pccom_config_t *cfg)
         case TLV_CLIENT_KEY:
             ok = copy_blob((uint8_t **)&cfg->key_pem, &cfg->key_len, value, value_len);
             break;
-        case TLV_SIGNING_SECRET:
-            ok = copy_blob(&cfg->signing_secret, &cfg->signing_secret_len, value, value_len);
+        case TLV_DEVICE_KEY:
+            /* Chấp nhận đúng 32 byte. Không log giá trị; key là dữ liệu nhạy cảm. */
+            ok = value_len == sizeof(cfg->device_key);
+            if (ok) {
+                memcpy(cfg->device_key, value, value_len);
+                cfg->has_device_key = true;
+            }
             break;
         default:
             ESP_LOGW(TAG, "bỏ qua TLV tag=%u len=%u không xác định", (unsigned int)tag,
@@ -237,7 +242,8 @@ esp_err_t pccom_provision_wait(pccom_config_t *out_cfg)
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .source_clk = UART_SCLK_DEFAULT,
     };
-    esp_err_t err = uart_driver_install(PCCOM_UART, 4096, 0, 0, NULL, 0);
+    /* 8192 byterx buffer: đủ cho một dòng ~4KB (base64 PEM/chunk) không mất byte. */
+    esp_err_t err = uart_driver_install(PCCOM_UART, 8192, 0, 0, NULL, 0);
     if (err != ESP_OK) {
         return err;
     }
@@ -265,6 +271,9 @@ esp_err_t pccom_provision_wait(pccom_config_t *out_cfg)
     send_reply("+READY\n");
 
     size_t line_len = 0;
+    size_t assembled_len = 0;
+    size_t assembled_chunks = 0;
+    size_t expected_chunks = 0;
     int idle_ms = 0;
     for (;;) {
         uint8_t ch = 0;
@@ -295,9 +304,91 @@ esp_err_t pccom_provision_wait(pccom_config_t *out_cfg)
 
             esp_err_t result = ESP_FAIL;
             const char *reason = "BAD_FRAME";
+            bool handled_chunk = false;
+            bool chunked_line = false;
 
             const size_t prefix_len = strlen(PCCOM_FRAME_PREFIX);
             if (strncmp(line, PCCOM_FRAME_PREFIX, prefix_len) == 0) {
+                char *body = line + prefix_len;
+
+                /* Khung chunked: PCCOM:C<seq>/<total>:<b64>,<crc32 chunk> rồi
+                 * PCCOM:S<crc32 tổng>. CRC từng chunk được kiểm chứng trước khi
+                 * ghép; CRC tổng được kiểm chứng trước khi parse TLV/ghi NVS. */
+                if (body[0] == 'C' || body[0] == 'S') {
+                    chunked_line = true;
+                    char *comma = strchr(body, ',');
+                    if (comma != NULL) {
+                        *comma = '\0';
+                    }
+                    if (body[0] == 'C') {
+                        char *colon = strchr(body + 1, ':');
+                        char *slash = colon != NULL ? strchr(body + 1, '/') : NULL;
+                        uint32_t chunk_crc = 0;
+                        if (colon == NULL || slash == NULL || comma == NULL ||
+                            slash > colon) {
+                            reason = "BAD_FRAME";
+                        } else {
+                            *colon = '\0';
+                            *slash = '\0';
+                            int seq = atoi(body + 1);
+                            int total = atoi(slash + 1);
+                            if (seq < 1 || total < 1 || seq > total ||
+                                (expected_chunks != 0 && (size_t)total != expected_chunks) ||
+                                (size_t)seq != assembled_chunks + 1) {
+                                reason = "BAD_FRAME";
+                            } else if (!parse_crc_hex(comma + 1, &chunk_crc)) {
+                                reason = "BAD_FRAME";
+                            } else {
+                                size_t out_len = 0;
+                                int b64_ret = mbedtls_base64_decode(
+                                    decoded + assembled_len,
+                                    PCCOM_MAX_DECODED - assembled_len, &out_len,
+                                    (const unsigned char *)(colon + 1),
+                                    strlen(colon + 1));
+                                if (b64_ret != 0) {
+                                    reason = "BAD_BASE64";
+                                } else if (crc32_ieee(decoded + assembled_len,
+                                                      out_len) != chunk_crc) {
+                                    reason = "CRC_MISMATCH";
+                                } else {
+                                    assembled_len += out_len;
+                                    assembled_chunks++;
+                                    expected_chunks = (size_t)total;
+                                    handled_chunk = true;
+                                    result = ESP_OK;
+                                }
+                            }
+                        }
+                    } else if (comma == NULL) {
+                        reason = "BAD_FRAME";
+                    } else {
+                        uint32_t total_crc = 0;
+                        if (!parse_crc_hex(body + 1, &total_crc)) {
+                            reason = "BAD_FRAME";
+                        } else if (expected_chunks == 0 ||
+                                   assembled_chunks != expected_chunks) {
+                            reason = "BAD_FRAME";
+                        } else if (crc32_ieee(decoded, assembled_len) != total_crc) {
+                            reason = "CRC_MISMATCH_TOTAL";
+                        } else {
+                            pccom_config_t candidate;
+                            memset(&candidate, 0, sizeof(candidate));
+                            if (!parse_tlv(decoded, assembled_len, &candidate)) {
+                                reason = "BAD_TLV";
+                                pccom_config_free(&candidate);
+                            } else if (!pccom_config_is_valid(&candidate)) {
+                                reason = "MISSING_FIELD";
+                                pccom_config_free(&candidate);
+                            } else {
+                                result = pccom_nvs_save(&candidate);
+                                pccom_config_free(&candidate);
+                                reason = "NVS_FAIL";
+                            }
+                        }
+                    }
+                    goto line_done;
+                }
+
                 char *comma = strchr(line + prefix_len, ',');
                 if (comma != NULL) {
                     *comma = '\0';
@@ -334,7 +425,12 @@ esp_err_t pccom_provision_wait(pccom_config_t *out_cfg)
                 }
             }
 
+line_done:
             line_len = 0;
+            if (handled_chunk && result == ESP_OK) {
+                send_reply("+OK\n");
+                continue;
+            }
             if (result == ESP_OK) {
                 send_reply("+ACK\n");
                 ESP_LOGI(TAG, "provisioning thành công; đã lưu vào NVS");
@@ -342,6 +438,12 @@ esp_err_t pccom_provision_wait(pccom_config_t *out_cfg)
                 free(decoded);
                 uart_driver_delete(PCCOM_UART);
                 return ESP_OK;
+            }
+            if (chunked_line) {
+                /* Một chunk/summary hỏng: bỏ toàn bộ khung, bắt đầu lại từ đầu. */
+                assembled_len = 0;
+                assembled_chunks = 0;
+                expected_chunks = 0;
             }
             char reply[48];
             snprintf(reply, sizeof(reply), "-ERR %s\n", reason);

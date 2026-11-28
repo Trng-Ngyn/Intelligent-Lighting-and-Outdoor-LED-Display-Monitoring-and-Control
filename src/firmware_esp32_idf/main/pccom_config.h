@@ -11,6 +11,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/queue.h"
+#include "freertos/task.h"
 
 #define PCCOM_NVS_PARTITION "nvs"
 #define PCCOM_NVS_NAMESPACE "pccom_cfg"
@@ -31,9 +32,20 @@
 #define PCCOM_WILL_DELAY_SEC 0
 
 /* S3 hardening: watchdog 30s đủ cho 3 task feed; time/provisioning có timeout
- * để không bao giờ treo vĩnh viễn chờ SNTP hoặc UART. */
+ * để không bao giờ treo vĩnh viễn chờ SNTP hoặc UART. Mỗi lần thử mạng phải
+ * ngắn hơn TWDT; tổng ngân sách WiFi+SNTP vẫn là 120s. */
 #define PCCOM_WDT_TIMEOUT_MS 30000
+#define PCCOM_NET_ATTEMPT_TIMEOUT_MS 25000
 #define PCCOM_NET_WAIT_TIMEOUT_MS 120000
+
+/* Backoff kết nối lại: 1s -> 30s, có jitter để tránh đồng bộ hóa thiết bị. */
+#define PCCOM_BACKOFF_MIN_MS 1000
+#define PCCOM_BACKOFF_MAX_MS 30000
+#define PCCOM_BACKOFF_JITTER_MS 500
+
+/* Lab phát cert broker cho CN này; khi broker được gọi bằng IP vẫn verify hostname. */
+#define PCCOM_CERT_COMMON_NAME "mqtt.dev.pccom.test"
+#define PCCOM_MQTT_TASK_NAME "mqtt_task"  /* tên task của esp-mqtt trong IDF 5.4 */
 #define PCCOM_PROVISION_IDLE_TIMEOUT_MS 120000
 #define PCCOM_PROVISION_VERSION 1u
 
@@ -66,9 +78,10 @@ typedef struct {
     char *key_pem;
     size_t key_len;
 
-    /* HMAC master secret dạng bytes UTF-8; KHÔNG in ra log. */
-    uint8_t *signing_secret;
-    size_t signing_secret_len;
+    /* Device key 32 byte đã được DẪN XUẤT TRÊN HOST. Firmware không nhận và
+     * không lưu master secret; không bao giờ in giá trị này ra log. */
+    uint8_t device_key[32];
+    bool has_device_key;
 } pccom_config_t;
 
 /* Tín hiệu nhịp 10s từ Telemetry task tới Ingestion task. */
@@ -99,6 +112,13 @@ typedef struct {
     volatile uint32_t published;
     volatile uint32_t publish_failures;
     volatile uint32_t net_retries;
+    volatile uint32_t reconnect_count;
+    volatile uint32_t queue_overflow;
+
+    /* Handle để log stack high-water của 3 task ứng dụng mỗi 60s. */
+    TaskHandle_t net_task;
+    TaskHandle_t ingest_task;
+    TaskHandle_t tele_task;
 } pccom_context_t;
 
 void pccom_config_free(pccom_config_t *cfg);

@@ -7,8 +7,10 @@
 #include "esp_err.h"
 #include "pccom_config.h"
 
-/* device_key = HMAC-SHA256(master_secret, "{site}/{device_type}/{device_id}") */
-esp_err_t pccom_derive_device_key(const pccom_config_t *cfg, uint8_t key[32]);
+/* Firmware không dẫn xuất từ master secret: device key 32 byte đã được host
+ * tính bằng HMAC-SHA256(master, "{site}/{device_type}/{device_id}") và nạp
+ * qua provisioning. Hàm này chỉ copy key đã lưu trong NVS. */
+esp_err_t pccom_copy_device_key(const pccom_config_t *cfg, uint8_t key[32]);
 
 /* canonical = "v1\n{topic}\n{correlation_id}\n{ts_ms}\n{payload}" */
 esp_err_t pccom_sign_message(const uint8_t key[32], const char *topic,
