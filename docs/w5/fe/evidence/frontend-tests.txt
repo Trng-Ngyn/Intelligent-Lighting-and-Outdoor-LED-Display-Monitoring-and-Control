@@ -1,0 +1,14 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> pccom-operations-console@1.0.0 test
+> vitest run
+
+
+ RUN  v5.1.2 /workspace/scratch/a5076e989fa2/repo
+
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  21:07:03
+   Duration  252ms (import 34%, transform 33%, tests 18%, worker 14%)
+

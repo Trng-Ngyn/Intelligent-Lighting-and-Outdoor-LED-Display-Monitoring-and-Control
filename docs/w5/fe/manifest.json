@@ -1,0 +1,119 @@
+{
+  "role": "W5-FE",
+  "date": "2026-11-27",
+  "base": "main 817aeb30dc1454dc704f92f05677cfcaf65971e0",
+  "install": "Extract at repository root, preserve paths; combine DE+FE+TL for staging integration. No secrets or generated binaries included.",
+  "files": [
+    {
+      "path": "docs/w5/fe/GUIDE.md",
+      "sha256": "663552f4798af50bdb8c17a76e7fb31443d034bedf679722ebd7c815cd6f4c64",
+      "size": 6929
+    },
+    {
+      "path": "docs/w5/fe/TEST_REPORT.md",
+      "sha256": "cfb277ee75a21a72c8e49dbced588ffa23aa43884da0d435bfd6e3d42158914d",
+      "size": 4599
+    },
+    {
+      "path": "docs/w5/fe/evidence/frontend-build.txt",
+      "sha256": "d7af1573f51cc4912cc50f655ca722d846a2aed40dd3b87b573f2e3a88182f24",
+      "size": 921
+    },
+    {
+      "path": "docs/w5/fe/evidence/frontend-tests.txt",
+      "sha256": "1aab3f0dadf379cb61d88f2592a703059845c9cb8110dccf7e076b7acac42881",
+      "size": 401
+    },
+    {
+      "path": "docs/w5/fe/evidence/native-acceptance.txt",
+      "sha256": "296958ea10e2b81aa60c6fb8c7e6a1d5fcf36401a0b0ea64db84602e66eddeea",
+      "size": 917
+    },
+    {
+      "path": "docs/w5/fe/evidence/native-result.json",
+      "sha256": "b1f52e1d665cf53e9f7b9c106631736cc02d53ebce745dfe02e7df722a8ff88e",
+      "size": 2143
+    },
+    {
+      "path": "index.html",
+      "sha256": "a332492d6b1c3cc757840d5dc79d4cda58c9e2867ef0b4704f7d469cc462d51c",
+      "size": 448
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "c4ea6f5e4b3862ee780532063504271ce529d3c4aa57cbfd44505c7171136ab1",
+      "size": 96166
+    },
+    {
+      "path": "package.json",
+      "sha256": "8e4cf11fd99defd37cfa2812ddce580e540a364727e83a9cdf80ec4a531bb87e",
+      "size": 757
+    },
+    {
+      "path": "src/App.tsx",
+      "sha256": "b5de49e6057adc5a9de6e609765cc73f9fe8d2f158ac799c629eab06e4728b23",
+      "size": 45
+    },
+    {
+      "path": "src/console/AssetMap.tsx",
+      "sha256": "cd49b4e5426030c9f1dc9a64dd7e4334c94b258cb5cf9e0490182fd57a54e936",
+      "size": 2196
+    },
+    {
+      "path": "src/console/Chart.tsx",
+      "sha256": "b0129c6d9bf4065674ffdb7e146bc339e49a656831bb270a0215e428f319925c",
+      "size": 1846
+    },
+    {
+      "path": "src/console/Console.tsx",
+      "sha256": "e66bbcc25db3735cdcc6c3e44c9fe1984c23e2a4d483a38003653467373a21e3",
+      "size": 11588
+    },
+    {
+      "path": "src/console/api.ts",
+      "sha256": "a68814b9fab490ee9afccc88e147c59d76fb8e5a1984d792ccfaf5b273f912f2",
+      "size": 2805
+    },
+    {
+      "path": "src/console/env.d.ts",
+      "sha256": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5",
+      "size": 38
+    },
+    {
+      "path": "src/console/model.test.ts",
+      "sha256": "71e358b56f05013f3eca5872ef2b741608a1d404149a83b3708044371edcdd63",
+      "size": 1432
+    },
+    {
+      "path": "src/console/model.ts",
+      "sha256": "14e67c955eac191866652a1b024b6f2a58703454b117edc2f516c4d2c24765e7",
+      "size": 1516
+    },
+    {
+      "path": "src/console/style.css",
+      "sha256": "dbe5058867de651be8a9bee0b1749254967e6302b1b18a7cbdf730fb9827da9e",
+      "size": 5100
+    },
+    {
+      "path": "src/main.tsx",
+      "sha256": "1838e9d01bbe0c0a3f2c275f5120d30dc1d4148c85c5a27a78ab87af8ea29d88",
+      "size": 510
+    },
+    {
+      "path": "tests/w5/test_browser.py",
+      "sha256": "0e1dd740985d58d5a59e6a2d3d9f3e79f66b7d60179af5d951b0fc76b8eda506",
+      "size": 5893
+    },
+    {
+      "path": "tsconfig.json",
+      "sha256": "12fe3c22d792f6454c2d5d21899df56ef26c6e8051e5170fc3f14cefc5ee3e89",
+      "size": 383
+    },
+    {
+      "path": "vite.config.ts",
+      "sha256": "bb1efce3cb2000cf699be9079a8af4c5626c13b45d2802427aed0e58ef4b4b59",
+      "size": 316
+    }
+  ],
+  "revision": "2026-11-27 native MQTT/Timescale/browser acceptance passed"
+}
